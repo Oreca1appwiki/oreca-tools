@@ -39,4 +39,20 @@ assert.equal(goku.perChapter.length, 1);
 assert.equal(goku.perChapter[0].chapter, '第7章');
 assert.ok(goku.perChapter[0].maxProbability > 0);
 
+// 絞り込み用メタデータ：章、モンスター★、パーティ★帯。
+const slime = monsters.find(x => x.value === 'スライム');
+assert.equal(slime.star, 1);
+assert.ok(slime.chapterIndexes.includes(0));
+const captainAzure = monsters.find(x => x.value === 'キャプテン・アズール');
+assert.equal(captainAzure.star, 3);
+const maouAzure = monsters.find(x => x.value === '魔王アズール');
+assert.equal(maouAzure.star, 4);
+const qq = monsters.find(x => x.value === 'ロボ参式　ＱＱ型');
+assert.equal(qq.star, 3);
+assert.equal(monsters.filter(x => x.star == null).length, 0);
+
+const sampleParty = parties.find(x => x.value === '銃士ダルタ / ジャンヌ / ランチュラ');
+assert.ok(sampleParty.chapterIndexes.includes(2));
+assert.ok(sampleParty.bandIndexes.includes(1));
+
 console.log('encounter-engine.test.js: ok');

@@ -314,7 +314,7 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px c
 
 /* v0.5.0: 最適遭遇条件 */
 .encounter-shell { width: min(920px, 100%); }
-.encounter-input-grid { grid-template-columns: minmax(150px, .7fr) minmax(0, 1.3fr); }
+.encounter-input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .encounter-target-field { margin-top: 12px; }
 .encounter-result { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
 .encounter-result-main .result-number { font-size: clamp(30px, 8vw, 46px); }

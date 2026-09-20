@@ -1,4 +1,5 @@
 import { PARTY_ROWS } from './data.js';
+import { getMonsterStar } from './monster-stars.js';
 
 export const CHAPTERS = ['序章','第1章','第2章','第3章','第4章','第5章','第6章','第7章'];
 export const BANDS = ['3–6','7–9','10–12'];
@@ -20,23 +21,38 @@ function localeSort(a, b) {
 }
 
 export function getMonsterTargets(rows = PARTY_ROWS) {
-  const names = new Set();
-  const bossNames = new Set();
+  const meta = new Map();
   for (const row of rows) {
     for (const part of splitParty(row[3])) {
-      names.add(part.name);
-      if (part.isBoss) bossNames.add(part.name);
+      const item = meta.get(part.name) || { isBoss: false, chapterIndexes: new Set() };
+      item.isBoss ||= part.isBoss;
+      item.chapterIndexes.add(row[0]);
+      meta.set(part.name, item);
     }
   }
-  return [...names].sort(localeSort).map(name => ({
+  return [...meta.entries()].sort((a, b) => localeSort(a[0], b[0])).map(([name, item]) => ({
     value: name,
-    label: bossNames.has(name) ? `(BOSS)${name}` : name,
-    isBoss: bossNames.has(name),
+    label: item.isBoss ? `(BOSS)${name}` : name,
+    isBoss: item.isBoss,
+    chapterIndexes: [...item.chapterIndexes].sort((a, b) => a - b),
+    star: getMonsterStar(name),
   }));
 }
 
 export function getPartyTargets(rows = PARTY_ROWS) {
-  return [...new Set(rows.map(row => row[3]))].sort(localeSort).map(value => ({ value, label: value }));
+  const meta = new Map();
+  for (const row of rows) {
+    const item = meta.get(row[3]) || { chapterIndexes: new Set(), bandIndexes: new Set() };
+    item.chapterIndexes.add(row[0]);
+    if (row[2] >= 0) item.bandIndexes.add(row[2]);
+    meta.set(row[3], item);
+  }
+  return [...meta.entries()].sort((a, b) => localeSort(a[0], b[0])).map(([value, item]) => ({
+    value,
+    label: value,
+    chapterIndexes: [...item.chapterIndexes].sort((a, b) => a - b),
+    bandIndexes: [...item.bandIndexes].sort((a, b) => a - b),
+  }));
 }
 
 export function rowMatchesTarget(row, kind, targetValue) {
