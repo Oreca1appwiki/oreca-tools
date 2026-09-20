@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oreca-tools-v0.5.2';
+const CACHE_NAME = 'oreca-tools-v0.5.4';
 const CORE = [
   './',
   './index.html',

@@ -1,9 +1,9 @@
 {
   "name": "oreca-tools",
-  "version": "0.5.2",
+  "version": "0.5.4",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/damage-engine.test.js && node tests/kill-engine.test.js && node tests/audit-kill-core.mjs && node tests/encounter-engine.test.js && node tests/skill-engine.test.js"
+    "test": "node tests/damage-engine.test.js && node tests/kill-engine.test.js && node tests/kill-presets.test.js && node tests/audit-kill-core.mjs && node tests/encounter-engine.test.js && node tests/skill-engine.test.js"
   }
 }

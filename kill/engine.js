@@ -173,13 +173,13 @@ export const DEFAULT_STATE = Object.freeze({
   },
   allyCount: 3,
   allies: [
-    { characterId: 'son_goku', attack: '84', speed: '78' },
-    { characterId: 'gyumao', attack: '94', speed: '15' },
-    { characterId: '', attack: '0', speed: '0' }
+    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind' },
+    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire' },
+    { characterId: '', attack: '0', speed: '0', star: '', attribute: '' }
   ],
   turns: [{
     allyActions: [
-      { ...defaultAttackAction(), kind: 'buff', skillName: 'ロキブランド', buff: { type: 'atkBuff', target: 'all', mode: 'mult', value: '150', duration: '2' } },
+      { ...defaultAttackAction(), kind: 'buff', skillName: 'ロキブランド', buff: { type: 'atkBuff', target: 'star4', mode: 'mult', value: '150', duration: '2' } },
       { ...defaultAttackAction(), kind: 'buff', skillName: '鬼の気合入れ', buff: { type: 'atkBuff', target: 'self', mode: 'mult', value: '200', duration: '1' } },
       { ...defaultSkipAction(), skillName: '' }
     ],
@@ -435,14 +435,17 @@ function hpRange(hpDist) {
   return { min: Math.min(...live), max: Math.max(...live) };
 }
 
-function normalizeTarget(effect, actorIndex, allyCount) {
+function normalizeTarget(effect, actorIndex, runtime) {
   const target = effect.target ?? 'self';
+  const allyCount = runtime.allyCount;
   if (Array.isArray(target)) {
-    return [...new Set(target.flatMap(item => normalizeTarget({ target: item }, actorIndex, allyCount)))];
+    return [...new Set(target.flatMap(item => normalizeTarget({ target: item }, actorIndex, runtime)))];
   }
   if (target === 'all') return Array.from({ length: allyCount }, (_, i) => i);
   if (target === 'self') return [actorIndex];
   if (target === 'others') return Array.from({ length: allyCount }, (_, i) => i).filter(i => i !== actorIndex);
+  if (target === 'star4') return runtime.allies.map((ally, i) => Number(ally.star) === 4 ? i : -1).filter(i => i >= 0);
+  if (target === 'fireAllies') return runtime.allies.map((ally, i) => ally.attribute === 'fire' ? i : -1).filter(i => i >= 0);
   const m = /^ally(\d)$/.exec(target);
   if (m) {
     const i = Number(m[1]) - 1;
@@ -528,13 +531,13 @@ function allyEffect(runtime, effect, actorIndex) {
   const sourceContext = { actorIndex, actionsTaken: runtime.allies[actorIndex].actionsTaken };
   switch (effect.type) {
     case 'atkBuff': {
-      for (const i of normalizeTarget(effect, actorIndex, runtime.allyCount)) {
+      for (const i of normalizeTarget(effect, actorIndex, runtime)) {
         addTimedMod(runtime.allies[i].attackMods, effect, runtime.seq, 'mult', sourceContext);
       }
       break;
     }
     case 'speedBuff': {
-      for (const i of normalizeTarget(effect, actorIndex, runtime.allyCount)) {
+      for (const i of normalizeTarget(effect, actorIndex, runtime)) {
         addTimedMod(runtime.allies[i].speedMods, effect, runtime.seq, 'mult', sourceContext);
       }
       break;
@@ -555,7 +558,7 @@ function allyEffect(runtime, effect, actorIndex) {
       if (runtime.enemy.poison === 'poison') runtime.enemy.poison = 'deadlyPoison';
       break;
     case 'weaknessBuff':
-      for (const i of normalizeTarget(effect, actorIndex, runtime.allyCount)) addTimedFlag(runtime.allies[i].weaknessMods, effect, runtime.seq);
+      for (const i of normalizeTarget(effect, actorIndex, runtime)) addTimedFlag(runtime.allies[i].weaknessMods, effect, runtime.seq);
       break;
     default:
       break;
@@ -566,12 +569,12 @@ function enemyEffect(runtime, effect, hpDist) {
   runtime.seq += 1;
   switch (effect.type) {
     case 'allyAtkDebuff': {
-      const targets = normalizeTarget(effect, 0, runtime.allyCount);
+      const targets = normalizeTarget(effect, 0, runtime);
       for (const i of targets) addTimedMod(runtime.allies[i].attackMods, effect, runtime.seq);
       return hpDist;
     }
     case 'allySpeedDebuff': {
-      const targets = normalizeTarget(effect, 0, runtime.allyCount);
+      const targets = normalizeTarget(effect, 0, runtime);
       for (const i of targets) addTimedMod(runtime.allies[i].speedMods, effect, runtime.seq);
       return hpDist;
     }
@@ -696,6 +699,8 @@ export function simulateKillProbability(state) {
     allies: Array.from({ length: allyCount }, (_, i) => ({
       baseAttack: parseNumber(state.allies?.[i]?.attack, `キャラ${i + 1}の攻撃力`, { min: 0 }),
       baseSpeed: parseNumber(state.allies?.[i]?.speed, `キャラ${i + 1}の素早さ`, { min: 0 }),
+      star: state.allies?.[i]?.star ?? '',
+      attribute: state.allies?.[i]?.attribute ?? '',
       attackMods: [],
       speedMods: [],
       weaknessMods: [],

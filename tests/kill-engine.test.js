@@ -74,9 +74,9 @@ console.log('kill-engine tests: OK');
   assert.equal(s.enemy.attribute, 'fire');
   assert.equal(s.enemy.speed, '45');
   assert.deepEqual(s.allies, [
-    { characterId: 'son_goku', attack: '84', speed: '78' },
-    { characterId: 'gyumao', attack: '94', speed: '15' },
-    { characterId: '', attack: '0', speed: '0' }
+    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind' },
+    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire' },
+    { characterId: '', attack: '0', speed: '0', star: '', attribute: '' }
   ]);
   assert.equal(s.turns[0].allyActions[0].skillName, 'ロキブランド');
   assert.equal(s.turns[0].allyActions[0].buff.value, '150');
@@ -203,8 +203,8 @@ console.log('kill-engine tests: OK');
 }
 
 
-// 12) 「主要技」はバトル入手チャート末尾のコマンドサンプル一覧と明示追加技だけ。
-// キャラクタープリセット専用技は自動入力には使うが、主要技メニューには出さない。
+// 12) バトル入手チャート由来の主要技に加え、モンスタープリセット由来の補助技も選択可能にする。
+// モンスタープリセット由来の技は「その他」にまとめる。
 {
   const majorIds = new Set(SKILL_PRESETS.filter(x => x.major === true).map(x => x.id));
   for (const id of [
@@ -215,14 +215,13 @@ console.log('kill-engine tests: OK');
     'red_fire_breath', 'blue_aqua_breath', 'yellow_earth_breath', 'green_air_breath',
     'red_point_2', 'blue_point_2', 'yellow_point_2', 'green_point_2',
     // ユーザー指定の追加枠
-    'epidemic_glass', 'poison_bite', 'melting_breath', 'suck_dry'
-  ]) assert.ok(majorIds.has(id), `${id} should be a major skill`);
-
-  for (const id of [
+    'epidemic_glass', 'poison_bite', 'melting_breath', 'suck_dry',
+    // モンスタープリセット由来の「その他」
     'foot_sweep', 'attack_bang', 'dragon_tail', 'aqua_breath', 'shining_breath',
-    'fire1', 'ice1', 'thunder1', 'meteor', 'purifying_flame', 'shiden', 'critical_hit',
-    'shibire_giri', 'ninja_thunder'
-  ]) assert.equal(majorIds.has(id), false, `${id} must stay character-preset-only`);
+    'fire1', 'ice1', 'thunder1', 'meteor', 'purifying_flame', 'shiden', 'critical_hit', 'shibire_giri'
+  ]) assert.ok(majorIds.has(id), `${id} should be selectable`);
+
+  assert.equal(majorIds.has('ninja_thunder'), false, 'removed ninja_thunder must stay unavailable');
 }
 
 
@@ -234,7 +233,7 @@ console.log('kill-engine tests: OK');
   assert.deepEqual(suck.buff, { type: 'atkBuff', target: 'self', mode: 'add', value: '15', duration: '3' });
 
   const loki = SKILL_PRESET_BY_ID.get('loki_brand');
-  assert.deepEqual(loki.buff, { type: 'atkBuff', target: 'all', mode: 'mult', value: '150', duration: '2' });
+  assert.deepEqual(loki.buff, { type: 'atkBuff', target: 'star4', mode: 'mult', value: '150', duration: '2' });
   const gaze = SKILL_PRESET_BY_ID.get('sea_king_gaze');
   assert.deepEqual(gaze.buff, { type: 'atkBuff', target: 'self', mode: 'add', value: '30', duration: '99' });
 
@@ -425,10 +424,15 @@ console.log('kill-engine tests: OK');
 }
 
 
-// 22) 「その他」カテゴリは悪疫グラスだけ。
+// 22) 「その他」カテゴリには悪疫グラスとモンスタープリセット由来の補助技を表示する。
 {
   const others = SKILL_PRESETS.filter(x => x.major === true && x.majorGroup === 'other');
-  assert.deepEqual(others.map(x => x.id), ['epidemic_glass']);
+  assert.deepEqual(others.map(x => x.id), [
+    'epidemic_glass',
+    'foot_sweep', 'shibire_giri', 'attack_bang', 'dragon_tail',
+    'aqua_breath', 'shining_breath', 'fire1', 'ice1', 'thunder1', 'meteor',
+    'purifying_flame', 'shiden', 'critical_hit'
+  ]);
 }
 
 // 23) ポイントは2EX相当の250%だけを残し、表示名からEX表記を外す。
@@ -483,8 +487,8 @@ console.log('kill-engine tests: OK');
 {
   const loki = SKILL_PRESET_BY_ID.get('loki_brand');
   const sun = SKILL_PRESET_BY_ID.get('sun_hymn');
-  assert.equal(loki.buff.target, 'all');
-  assert.deepEqual(sun.buff.target, ['ally1', 'ally2']);
+  assert.equal(loki.buff.target, 'star4');
+  assert.equal(sun.buff.target, 'fireAllies');
 }
 
 // 27) アイテムパーツは自身の攻撃+25・素早さ+60を3ターン付与する。
@@ -543,4 +547,55 @@ console.log('kill-engine tests: OK');
   const r = simulateKillProbability(s);
   // ATK82・SPD144 -> 1発 floor(49.2+21.6)=70、風弱点105、7ヒット。最低各99で693なので500は確定撃破。
   approx(r.killChance, 1);
+}
+
+
+// 追加) ロキブランドは★4だけを自動対象にする。
+{
+  const make = star => {
+    const s = cloneDefaultState();
+    s.allyCount = 2;
+    s.enemy.maxHp = '140';
+    s.enemy.speed = '1';
+    s.allies[0] = { characterId: '', attack: '0', speed: '100', star: '4', attribute: 'wind' };
+    s.allies[1] = { characterId: '', attack: '100', speed: '50', star, attribute: 'water' };
+    s.turns[0].allyActions[0] = {
+      kind: 'buff',
+      buff: { type: 'atkBuff', target: 'star4', mode: 'mult', value: '150', duration: '2' },
+      effects: []
+    };
+    s.turns[0].allyActions[1] = { kind: 'skip', effects: [] };
+    s.turns[0].enemyAction.enabled = false;
+    s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+    s.turns[1].allyActions[0] = { kind: 'skip', effects: [] };
+    s.turns[1].allyActions[1] = { kind: 'attack', skillMultiplier: '100', attackAttribute: 'none', hits: '1', effects: [] };
+    return simulateKillProbability(s);
+  };
+  approx(make('4').killChance, 1);
+  approx(make('3').killChance, 0);
+}
+
+// 追加) 太陽讃歌は火属性だけを自動対象にする。
+{
+  const make = attribute => {
+    const s = cloneDefaultState();
+    s.allyCount = 2;
+    s.enemy.maxHp = '140';
+    s.enemy.speed = '1';
+    s.allies[0] = { characterId: '', attack: '0', speed: '100', star: '4', attribute: 'wind' };
+    s.allies[1] = { characterId: '', attack: '100', speed: '50', star: '3', attribute };
+    s.turns[0].allyActions[0] = {
+      kind: 'buff',
+      buff: { type: 'atkBuff', target: 'fireAllies', mode: 'add', value: '50', duration: '2' },
+      effects: []
+    };
+    s.turns[0].allyActions[1] = { kind: 'skip', effects: [] };
+    s.turns[0].enemyAction.enabled = false;
+    s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+    s.turns[1].allyActions[0] = { kind: 'skip', effects: [] };
+    s.turns[1].allyActions[1] = { kind: 'attack', skillMultiplier: '100', attackAttribute: 'none', hits: '1', effects: [] };
+    return simulateKillProbability(s);
+  };
+  approx(make('fire').killChance, 1);
+  approx(make('water').killChance, 0);
 }

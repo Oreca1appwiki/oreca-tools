@@ -30,65 +30,66 @@ for (const el of document.querySelectorAll('[data-app-version]')) el.textContent
 
 const ALLY_BUFF_TYPES = Object.freeze([['atkBuff', '攻撃力'], ['speedBuff', '素早さ']]);
 const ENEMY_BUFF_TYPES = Object.freeze([['enemyAtkBuff', '攻撃力'], ['enemySpeedBuff', '素早さ']]);
+const MONSTER_ATTRIBUTE_OPTIONS = Object.freeze([['', '選択してください'], ['fire', '火'], ['water', '水'], ['earth', '土'], ['wind', '風']]);
 
 const CHARACTER_PRESETS = Object.freeze([
   { id: '', name: '選択なし', group: 'none', skill: '', attack: '0', speed: '0' },
-  { id: 'son_goku', name: '斉天大聖ソンゴクウ', group: 'general', skill: 'ロキブランド', attack: '84', speed: '78', kind: 'buff' },
-  { id: 'gyumao', name: '牛魔王', group: 'general', skill: '鬼の気合入れ', attack: '94', speed: '15', kind: 'buff' },
-  { id: 'sylph', name: 'シルフ', group: 'general', skill: 'こうげき！', attack: '31', speed: '42', kind: 'attack' },
-  { id: 'crow', name: 'カラス', group: 'general', skill: 'こうげき！', attack: '31', speed: '63', kind: 'attack' },
-  { id: 'platinum_drake', name: 'プラチナドレイク', group: 'general', skill: '竜のしっぽ', attack: '78', speed: '78', kind: 'attack' },
-  { id: 'clear_blue_dragon', name: 'クリア・ブルードラゴン', group: 'general', skill: 'アクアブレス', attack: '73', speed: '68', kind: 'attack' },
-  { id: 'bahamut', name: '天界竜バハムート', group: 'general', skill: 'シャイニングブレス', attack: '89', speed: '73', kind: 'attack' },
-  { id: 'mimitoshishi', name: 'ミミトシシ', group: 'general', skill: 'こうげき！', attack: '42', speed: '63', kind: 'attack' },
-  { id: 'dark_bahamut', name: '冥界竜ダークバハムート', group: 'general', skill: 'ブレス系統（敵属性で選択）', attack: '89', speed: '73', kind: 'attack' },
-  { id: 'magora', name: 'マゴラ', group: 'general', skill: 'さけぶ', attack: '36', speed: '57', kind: 'buff' },
-  { id: 'kerogon_green', name: 'ケロゴン(緑)', group: 'general', skill: '竜のしっぽ', attack: '31', speed: '52', kind: 'attack' },
-  { id: 'oniwaka_monk', name: '僧兵オニワカ', group: 'general', skill: '足ばらい', attack: '63', speed: '47', kind: 'attack' },
-  { id: 'oniwaka', name: 'オニワカ', group: 'general', skill: '足ばらい', attack: '57', speed: '42', kind: 'attack' },
-  { id: 'red_empress', name: '赤のエンプレス', group: 'general', skill: '行動スキップ', attack: '63', speed: '84', kind: 'skip' },
-  { id: 'raijin_kukulkan', name: '雷神竜ククルカン', group: 'general', skill: 'つつきまくり', attack: '78', speed: '89', kind: 'attack' },
-  { id: 'venom_behemoth', name: '猛毒竜ベヒモス', group: 'general', skill: 'おしつぶし', attack: '73', speed: '15', kind: 'attack' },
-  { id: 'heavy_behemoth', name: '重竜ベヒモス', group: 'general', skill: 'おしつぶし', attack: '63', speed: '10', kind: 'attack' },
-  { id: 'kerogon_yellow', name: 'ケロゴン(黄)', group: 'general', skill: '竜のしっぽ', attack: '31', speed: '21', kind: 'attack' },
-  { id: 'guardian_powan', name: '魔海の守護者ポワン', group: 'both', skill: 'シャボン・グラン', attack: '73', speed: '73', kind: 'attack' },
-  { id: 'kerogon_blue', name: 'ケロゴン(青)', group: 'general', skill: '竜のしっぽ', attack: '31', speed: '42', kind: 'attack' },
-  { id: 'dartan', name: '無幻銃士ダルタン', group: 'general', skill: '連撃', attack: '78', speed: '36', kind: 'attack' },
-  { id: 'kerogon_gold', name: 'ケロゴン(金)', group: 'general', skill: '竜のしっぽ', attack: '36', speed: '10', kind: 'attack' },
-  { id: 'camineko', name: 'キャミネコ', group: 'general', skill: 'ファイア！／アイス！／サンダー！（敵属性で選択）', attack: '42', speed: '68', kind: 'attack' },
-  { id: 'garanezumi', name: 'ガラネズミ', group: 'general', skill: 'こうげき！', attack: '31', speed: '73', kind: 'attack' },
-  { id: 'black_knight_gebolg', name: '黒騎士ゲボルグ', group: 'general', skill: 'ヒートウェイブ', attack: '74', speed: '31', kind: 'attack' },
-  { id: 'rakshasa', name: 'ラクシャーサ', group: 'general', skill: 'ヒートウェイブ', attack: '53', speed: '21', kind: 'attack' },
-  { id: 'scarlet_dragon', name: 'スカーレッド・ドラゴン', group: 'general', skill: '竜のしっぽ', attack: '89', speed: '47', kind: 'attack' },
-  { id: 'kenran_kukulkan', name: '絢蘭竜ククルカン', group: 'general', skill: 'つつきまくり', attack: '78', speed: '89', kind: 'attack' },
-  { id: 'shinjuryu_kukulkan', name: '神樹竜ククルカン', group: 'general', skill: 'つつきまくり', attack: '78', speed: '84', kind: 'attack' },
-  { id: 'ifrit', name: '大魔神イフリート', group: 'general', skill: 'ファイア‼︎', attack: '84', speed: '42', kind: 'attack' },
-  { id: 'astaroth', name: '魔公爵アスタロト', group: 'general', skill: 'メテオ！', attack: '68', speed: '31', kind: 'attack' },
-  { id: 'loki', name: 'ロキ', group: 'general', skill: 'ロキブランド', attack: '63', speed: '68', kind: 'buff' },
-  { id: 'toritamago', name: '魔王のトリタマゴ', group: 'condition', skill: 'こうげき！', attack: '1', speed: '1', kind: 'attack' },
-  { id: 'ares', name: '熱剣士アレス', group: 'condition', skill: 'こうげき！', attack: '73', speed: '21', kind: 'attack' },
-  { id: 'chibimuus', name: 'チビムウス', group: 'condition', skill: 'こうげき！', attack: '45', speed: '15', kind: 'attack' },
-  { id: 'lafroig', name: '魔皇ラフロイグ', group: 'condition', skill: 'こうげき！', attack: '94', speed: '57', kind: 'attack' },
-  { id: 'mermaid_mellow', name: 'マーメイドメロウ', group: 'condition', skill: 'こうげき！', attack: '68', speed: '73', kind: 'attack' },
-  { id: 'captain_azul', name: 'キャプテン・アズール', group: 'condition', skill: 'シビレ斬り', attack: '63', speed: '42', kind: 'attack' },
-  { id: 'elysion', name: '光王エーリュシオン', group: 'condition', skill: '行動スキップ', attack: '78', speed: '52', kind: 'skip', secondSkill: '浄化の炎', secondKind: 'attack' },
-  { id: 'hien', name: '剣豪ヒエン', group: 'condition', skill: '紫電', attack: '63', speed: '78', kind: 'attack' },
-  { id: 'marduk', name: '王子マルドク', group: 'condition', skill: '会心の一撃', attack: '79', speed: '95', kind: 'attack' },
-  { id: 'enki', name: '老将エンキ', group: 'condition', skill: '会心の一撃', attack: '78', speed: '57', kind: 'attack' },
-  { id: 'damkina', name: 'ダムキナ', group: 'condition', skill: 'ウィンド‼︎', attack: '68', speed: '89', kind: 'attack' },
-  { id: 'saezer', name: '棘騎士サエザー', group: 'condition', skill: 'こうげき！', attack: '68', speed: '52', kind: 'attack' },
-  { id: 'dante_magic_swordsman', name: '魔剣士ダンテ', group: 'condition', skill: 'こうげき！', attack: '68', speed: '31', kind: 'attack' },
-  { id: 'simon', name: 'シモン', group: 'condition', skill: 'こうげき！', attack: '68', speed: '47', kind: 'attack' },
-  { id: 'hayate', name: '風隠の戦士ハヤテ', group: 'condition', skill: 'こうげき！', attack: '57', speed: '84', kind: 'attack' },
-  { id: 'sky_clay', name: '天空騎士クレイ', group: 'condition', skill: 'こうげき！', attack: '73', speed: '73', kind: 'attack' },
-  { id: 'djinn', name: '大魔神ジン', group: 'condition', skill: 'ウィンド‼︎', attack: '63', speed: '84', kind: 'attack' },
-  { id: 'gate_dante', name: '魔界の門番ダンテ', group: 'condition', skill: 'こうげき！', attack: '78', speed: '36', kind: 'attack' },
-  { id: 'yamato', name: 'ヤマト', group: 'condition', skill: 'こうげき！', attack: '78', speed: '78', kind: 'attack' },
-  { id: 'susanoo', name: 'スサノヲ', group: 'condition', skill: 'こうげき！', attack: '73', speed: '78', kind: 'attack' },
-  { id: 'nanawarai', name: '魔王ナナワライ', group: 'condition', skill: 'こうげき！', attack: '84', speed: '63', kind: 'attack' },
-  { id: 'ginger_ale', name: '魔王ジンジャーエイル', group: 'condition', skill: 'こうげき！', attack: '84', speed: '52', kind: 'attack' },
-  { id: 'soccerra', name: '邪神サッカーラ', group: 'condition', skill: 'こうげき！', attack: '92', speed: '26', kind: 'attack' },
-  { id: 'fire_drake', name: '煌竜王ファイアドレイク', group: 'condition', skill: 'こうげき！', attack: '84', speed: '47', kind: 'attack' }
+  { id: 'son_goku', name: '斉天大聖ソンゴクウ', group: 'general', skill: 'ロキブランド', attack: '84', speed: '78', star: '4', attribute: 'wind', kind: 'buff' },
+  { id: 'gyumao', name: '牛魔王', group: 'general', skill: '鬼の気合入れ', attack: '94', speed: '15', star: '4', attribute: 'fire', kind: 'buff' },
+  { id: 'sylph', name: 'シルフ', group: 'general', skill: 'こうげき！', attack: '31', speed: '42', star: '1', attribute: 'wind', kind: 'attack' },
+  { id: 'crow', name: 'カラス', group: 'general', skill: 'こうげき！', attack: '31', speed: '63', star: '1', attribute: 'wind', kind: 'attack' },
+  { id: 'platinum_drake', name: 'プラチナドレイク', group: 'general', skill: '竜のしっぽ', attack: '78', speed: '78', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'clear_blue_dragon', name: 'クリア・ブルードラゴン', group: 'general', skill: 'アクアブレス', attack: '73', speed: '68', star: '4', attribute: 'water', kind: 'attack' },
+  { id: 'bahamut', name: '天界竜バハムート', group: 'general', skill: 'シャイニングブレス', attack: '89', speed: '73', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'mimitoshishi', name: 'ミミトシシ', group: 'general', skill: 'こうげき！', attack: '42', speed: '63', star: '1', attribute: 'water', kind: 'attack' },
+  { id: 'dark_bahamut', name: '冥界竜ダークバハムート', group: 'general', skill: 'ブレス系統（敵属性で選択）', attack: '89', speed: '73', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'magora', name: 'マゴラ', group: 'general', skill: 'さけぶ', attack: '36', speed: '57', star: '1', attribute: 'wind', kind: 'buff' },
+  { id: 'kerogon_green', name: 'ケロゴン(緑)', group: 'general', skill: '竜のしっぽ', attack: '31', speed: '52', star: '1', attribute: 'wind', kind: 'attack' },
+  { id: 'oniwaka_monk', name: '僧兵オニワカ', group: 'general', skill: '足ばらい', attack: '63', speed: '47', star: '3', attribute: 'wind', kind: 'attack' },
+  { id: 'oniwaka', name: 'オニワカ', group: 'general', skill: '足ばらい', attack: '57', speed: '42', star: '2', attribute: 'wind', kind: 'attack' },
+  { id: 'red_empress', name: '赤のエンプレス', group: 'general', skill: '行動スキップ', attack: '63', speed: '84', star: '4', attribute: 'water', kind: 'skip' },
+  { id: 'raijin_kukulkan', name: '雷神竜ククルカン', group: 'general', skill: 'つつきまくり', attack: '78', speed: '89', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'venom_behemoth', name: '猛毒竜ベヒモス', group: 'general', skill: 'おしつぶし', attack: '73', speed: '15', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'heavy_behemoth', name: '重竜ベヒモス', group: 'general', skill: 'おしつぶし', attack: '63', speed: '10', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'kerogon_yellow', name: 'ケロゴン(黄)', group: 'general', skill: '竜のしっぽ', attack: '31', speed: '21', star: '1', attribute: 'earth', kind: 'attack' },
+  { id: 'guardian_powan', name: '魔海の守護者ポワン', group: 'both', skill: 'シャボン・グラン', attack: '73', speed: '73', star: '4', attribute: 'water', kind: 'attack' },
+  { id: 'kerogon_blue', name: 'ケロゴン(青)', group: 'general', skill: '竜のしっぽ', attack: '31', speed: '42', star: '1', attribute: 'water', kind: 'attack' },
+  { id: 'dartan', name: '無幻銃士ダルタン', group: 'general', skill: '連撃', attack: '78', speed: '36', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'kerogon_gold', name: 'ケロゴン(金)', group: 'general', skill: '竜のしっぽ', attack: '36', speed: '10', star: '1', attribute: 'fire', kind: 'attack' },
+  { id: 'camineko', name: 'キャミネコ', group: 'general', skill: 'ファイア！／アイス！／サンダー！（敵属性で選択）', attack: '42', speed: '68', star: '1', attribute: 'wind', kind: 'attack' },
+  { id: 'garanezumi', name: 'ガラネズミ', group: 'general', skill: 'こうげき！', attack: '31', speed: '73', star: '1', attribute: 'earth', kind: 'attack' },
+  { id: 'black_knight_gebolg', name: '黒騎士ゲボルグ', group: 'general', skill: 'ヒートウェイブ', attack: '74', speed: '31', star: '3', attribute: 'fire', kind: 'attack' },
+  { id: 'rakshasa', name: 'ラクシャーサ', group: 'general', skill: 'ヒートウェイブ', attack: '53', speed: '21', star: '2', attribute: 'earth', kind: 'attack' },
+  { id: 'scarlet_dragon', name: 'スカーレッド・ドラゴン', group: 'general', skill: '竜のしっぽ', attack: '89', speed: '47', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'kenran_kukulkan', name: '絢蘭竜ククルカン', group: 'general', skill: 'つつきまくり', attack: '78', speed: '89', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'shinjuryu_kukulkan', name: '神樹竜ククルカン', group: 'general', skill: 'つつきまくり', attack: '78', speed: '84', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'ifrit', name: '大魔神イフリート', group: 'general', skill: 'ファイア‼︎', attack: '84', speed: '42', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'astaroth', name: '魔公爵アスタロト', group: 'general', skill: 'メテオ！', attack: '68', speed: '31', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'loki', name: 'ロキ', group: 'general', skill: 'ロキブランド', attack: '63', speed: '68', star: '4', attribute: 'earth', kind: 'buff' },
+  { id: 'toritamago', name: '魔王のトリタマゴ', group: 'condition', skill: 'こうげき！', attack: '1', speed: '1', star: '1', attribute: 'fire', kind: 'attack' },
+  { id: 'ares', name: '熱剣士アレス', group: 'condition', skill: 'こうげき！', attack: '73', speed: '21', star: '3', attribute: 'fire', kind: 'attack' },
+  { id: 'chibimuus', name: 'チビムウス', group: 'condition', skill: 'こうげき！', attack: '45', speed: '15', star: '2', attribute: 'fire', kind: 'attack' },
+  { id: 'lafroig', name: '魔皇ラフロイグ', group: 'condition', skill: 'こうげき！', attack: '94', speed: '57', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'mermaid_mellow', name: 'マーメイドメロウ', group: 'condition', skill: 'こうげき！', attack: '68', speed: '73', star: '3', attribute: 'water', kind: 'attack' },
+  { id: 'captain_azul', name: 'キャプテン・アズール', group: 'condition', skill: 'シビレ斬り', attack: '63', speed: '42', star: '3', attribute: 'water', kind: 'attack' },
+  { id: 'elysion', name: '光王エーリュシオン', group: 'condition', skill: '行動スキップ', attack: '78', speed: '52', star: '4', attribute: 'earth', kind: 'skip', secondSkill: '浄化の炎', secondKind: 'attack' },
+  { id: 'hien', name: '剣豪ヒエン', group: 'condition', skill: '紫電', attack: '63', speed: '78', star: '3', attribute: 'wind', kind: 'attack' },
+  { id: 'marduk', name: '王子マルドク', group: 'condition', skill: '会心の一撃', attack: '79', speed: '95', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'enki', name: '老将エンキ', group: 'condition', skill: '会心の一撃', attack: '78', speed: '57', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'damkina', name: 'ダムキナ', group: 'condition', skill: 'ウィンド‼︎', attack: '68', speed: '89', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'saezer', name: '棘騎士サエザー', group: 'condition', skill: 'こうげき！', attack: '68', speed: '52', star: '3', attribute: 'water', kind: 'attack' },
+  { id: 'dante_magic_swordsman', name: '魔剣士ダンテ', group: 'condition', skill: 'こうげき！', attack: '68', speed: '31', star: '3', attribute: 'fire', kind: 'attack' },
+  { id: 'simon', name: 'シモン', group: 'condition', skill: 'こうげき！', attack: '68', speed: '47', star: '3', attribute: 'fire', kind: 'attack' },
+  { id: 'hayate', name: '風隠の戦士ハヤテ', group: 'condition', skill: 'こうげき！', attack: '57', speed: '84', star: '3', attribute: 'wind', kind: 'attack' },
+  { id: 'sky_clay', name: '天空騎士クレイ', group: 'condition', skill: 'こうげき！', attack: '73', speed: '73', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'djinn', name: '大魔神ジン', group: 'condition', skill: 'ウィンド‼︎', attack: '63', speed: '84', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'gate_dante', name: '魔界の門番ダンテ', group: 'condition', skill: 'こうげき！', attack: '78', speed: '36', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'yamato', name: 'ヤマト', group: 'condition', skill: 'こうげき！', attack: '78', speed: '78', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'susanoo', name: 'スサノヲ', group: 'condition', skill: 'こうげき！', attack: '73', speed: '78', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'nanawarai', name: '魔王ナナワライ', group: 'condition', skill: 'こうげき！', attack: '84', speed: '63', star: '4', attribute: 'wind', kind: 'attack' },
+  { id: 'ginger_ale', name: '魔王ジンジャーエイル', group: 'condition', skill: 'こうげき！', attack: '84', speed: '52', star: '4', attribute: 'fire', kind: 'attack' },
+  { id: 'soccerra', name: '邪神サッカーラ', group: 'condition', skill: 'こうげき！', attack: '92', speed: '26', star: '4', attribute: 'earth', kind: 'attack' },
+  { id: 'fire_drake', name: '煌竜王ファイアドレイク', group: 'condition', skill: 'こうげき！', attack: '84', speed: '47', star: '4', attribute: 'fire', kind: 'attack' }
 ]);
 
 // Wiki「バトル入手チャート」2ページでの採用・登場頻度を基準にした表示順。
@@ -122,8 +123,10 @@ const SKILL_USAGE_ORDER = Object.freeze([
   'fire_torture','water_torture','tatsumaki','kamaitachi','rain_god_spear','marking_arrow','paralysis_arrow',
   'poison_crush','deadly_blow','ikazuchi','fire_ice_breath2','shout','headwind','heat_wave','ice_storm_strike',
   'poison_bite','melting_breath','windmill',
-  // その他
-  'epidemic_glass'
+  // その他（モンスタープリセット由来の技を優先）
+  'attack_bang','dragon_tail','foot_sweep','shibire_giri',
+  'aqua_breath','shining_breath','fire1','ice1','thunder1','meteor',
+  'purifying_flame','shiden','critical_hit','epidemic_glass'
 ]);
 const SKILL_USAGE_RANK = new Map(SKILL_USAGE_ORDER.map((id, i) => [id, i]));
 
@@ -146,7 +149,9 @@ function statusForCharacter(state, characterId) {
   const saved = state.characterStats?.[characterId] ?? {};
   return {
     attack: preset?.attack ?? saved.attack ?? '',
-    speed: preset?.speed ?? saved.speed ?? ''
+    speed: preset?.speed ?? saved.speed ?? '',
+    star: preset?.star ?? saved.star ?? '',
+    attribute: preset?.attribute ?? saved.attribute ?? ''
   };
 }
 
@@ -217,6 +222,18 @@ function normalizeState(saved, legacyAmounts = false, attackBuffAmountNotation =
   state.characterStats = { ...defaultCharacterStats(), ...(saved.characterStats ?? {}) };
   state.allyCount = Math.min(3, Math.max(1, Number(saved.allyCount) || fallback.allyCount));
   state.allies = fallback.allies.map((ally, i) => ({ ...ally, ...(saved.allies?.[i] ?? {}), characterId: saved.allies?.[i]?.characterId ?? ally.characterId ?? '' }));
+  state.allies.forEach(ally => {
+    if (!ally.characterId) {
+      ally.star ??= '';
+      ally.attribute ??= '';
+      return;
+    }
+    const status = statusForCharacter(state, ally.characterId);
+    ally.attack = status.attack || '0';
+    ally.speed = status.speed || '0';
+    ally.star = status.star || '';
+    ally.attribute = status.attribute || '';
+  });
   state.turns = Array.isArray(saved.turns) && saved.turns.length ? saved.turns.slice(0, 12) : fallback.turns;
 
   const allowedEnemyAttrs = new Set(ENEMY_ATTRIBUTE_OPTIONS.map(([value]) => value));
@@ -312,6 +329,10 @@ function optionsHtml(items, selected) {
   return items.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === selected ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
 }
 
+function optionsLabel(items, selected) {
+  return items.find(([value]) => value === selected)?.[1] ?? '';
+}
+
 function characterOptionsHtml(selected) {
   const general = sortByUsage(CHARACTER_PRESETS.filter(x => x.id && (x.group === 'general' || x.group === 'both')), CHARACTER_USAGE_RANK);
   const condition = sortByUsage(CHARACTER_PRESETS.filter(x => x.id && (x.group === 'condition' || x.group === 'both')), CHARACTER_USAGE_RANK);
@@ -405,6 +426,8 @@ function applyCharacterPreset(allyIndex, characterId) {
   const status = statusForCharacter(state, characterId);
   ally.attack = status.attack || '0';
   ally.speed = status.speed || '0';
+  ally.star = status.star || '';
+  ally.attribute = status.attribute || '';
 
   state.turns.forEach((turn, turnIndex) => {
     const action = turn.allyActions[allyIndex];
@@ -414,21 +437,17 @@ function applyCharacterPreset(allyIndex, characterId) {
     }
     if (turnIndex === 0) {
       if (preset.kind === 'skip') {
-        action.kind = 'skip'; action.skillName = preset.skill; action.skillPresetId = ''; action.effects = [];
+        applySkillPresetToAction(action, SKIP_ACTION_PRESET);
       } else {
         const presetId = presetIdForCharacterSkill(characterId, preset.skill);
         if (presetId) {
           applySkillPresetToAction(action, presetId);
-          // キャラ専用技は値だけ自動入力し、「主要技プリセット」の選択状態にはしない。
-          if (SKILL_PRESET_BY_ID.get(presetId)?.major !== true) action.skillPresetId = '';
         } else { action.kind = preset.kind ?? 'attack'; action.skillName = preset.skill; action.skillPresetId = ''; }
       }
     } else if (preset.secondSkill && turnIndex === 1) {
       const presetId = presetIdForCharacterSkill(characterId, preset.secondSkill);
       if (presetId) {
         applySkillPresetToAction(action, presetId);
-        // キャラ専用技は値だけ自動入力し、「主要技プリセット」の選択状態にはしない。
-        if (SKILL_PRESET_BY_ID.get(presetId)?.major !== true) action.skillPresetId = '';
       } else { action.kind = preset.secondKind ?? 'attack'; action.skillName = preset.secondSkill; action.skillPresetId = ''; }
     } else {
       action.kind = 'same';
@@ -608,18 +627,19 @@ function actionCardHtml(action, turnIndex, allyIndex) {
   const randomMultiplier = action.skillMultiplierMin !== '' && action.skillMultiplierMax !== '';
   const randomHits = action.hitsMin !== '' && action.hitsMax !== '';
   const presetMeta = SKILL_PRESET_BY_ID.get(action.skillPresetId ?? '');
+  const presetSelected = Boolean(action.skillPresetId);
   return `
     <div class="action-card" data-turn-index="${turnIndex}" data-actor-key="${actorKey}">
       <div class="action-card-head">
         <strong>キャラ${allyIndex + 1}</strong>
-        <select class="action-kind" aria-label="キャラ${allyIndex + 1}の基本行動">
-          ${actionKindOptions(action, turnIndex)}
-        </select>
+        ${presetSelected
+          ? `<span class="preset-kind-label">${escapeHtml(action.kind === 'attack' ? '攻撃' : action.kind === 'buff' ? 'バフ' : action.kind === 'effect' ? '効果のみ' : action.kind === 'skip' ? '行動スキップ' : '同行動')}</span>`
+          : `<select class="action-kind" aria-label="キャラ${allyIndex + 1}の基本行動">${actionKindOptions(action, turnIndex)}</select>`}
       </div>
       ${action.kind !== 'same' ? `
         <label class="mini-field"><span>主要技プリセット</span><select class="skill-preset">${skillPresetOptionsHtml(action.skillPresetId ?? '')}</select></label>
-        ${presetMeta?.note ? `<p class="inline-note">${escapeHtml(presetMeta.note)}</p>` : ''}` : ''}
-      ${action.kind === 'attack' ? `
+        ${presetMeta?.note ? `<p class="inline-note">${escapeHtml(presetMeta.note)}</p>` : ''}${presetSelected ? `<p class="inline-note">プリセット効果を自動適用します。効果内容は編集できません。</p>` : ''}` : ''}
+      ${!presetSelected && action.kind === 'attack' ? `
         ${action.damageFormula === 'windmill' ? `<p class="inline-note"><strong>風車式:</strong> 1発=ATK×0.6+SPD×0.15 / ヒット数=max(1, floor(SPD÷20))、最大10回。現在のバフ後ステータスで計算します。</p>` : ''}
         <div class="action-input-grid">
           ${action.damageFormula === 'windmill' ? '' : (randomMultiplier ? `
@@ -635,9 +655,9 @@ function actionCardHtml(action, turnIndex, allyIndex) {
             <label class="mini-field"><span>ヒット数 上限</span><input class="hit-count-max" type="number" inputmode="numeric" step="1" min="1" max="50" value="${escapeHtml(action.hitsMax)}"></label>` : `
             <label class="mini-field"><span>ヒット数</span><input class="hit-count" type="number" inputmode="numeric" step="1" min="1" max="50" value="${escapeHtml(action.hits)}"></label>`)}
         </div>` : ''}
-      ${action.kind === 'buff' ? primaryBuffHtml(action.buff, 'ally', false, allyIndex) : ''}
+      ${!presetSelected && action.kind === 'buff' ? primaryBuffHtml(action.buff, 'ally', false, allyIndex) : ''}
       ${action.kind === 'same' ? '<p class="same-action-note">前回の同モンスターの行動内容をそのまま使用します。</p>' : ''}
-      ${['attack', 'buff', 'effect'].includes(action.kind) ? `
+      ${!presetSelected && ['attack', 'buff', 'effect'].includes(action.kind) ? `
         <div class="effects-block">
           <div class="sub-heading"><span>追加効果</span><button type="button" class="mini-add add-effect" data-side="ally">＋追加</button></div>
           <div class="effects-list">${effectsHtml(action.effects ?? [], 'ally', turnIndex, actorKey)}</div>
@@ -781,8 +801,17 @@ function render() {
           <div class="ally-card" data-ally-index="${i}">
             <strong>キャラ${i + 1}</strong>
             <label class="mini-field"><span>モンスター</span><select class="ally-character">${characterOptionsHtml(state.allies[i].characterId ?? '')}</select></label>
-            <label class="mini-field"><span>攻撃力</span><input class="ally-attack" type="number" inputmode="decimal" min="0" step="0.1" value="${escapeHtml(state.allies[i].attack)}"></label>
-            <label class="mini-field"><span>素早さ</span><input class="ally-speed" type="number" inputmode="decimal" min="0" step="0.1" value="${escapeHtml(state.allies[i].speed)}"></label>
+            ${state.allies[i].characterId ? `
+              <div class="preset-status-summary">
+                <span>攻撃 ${escapeHtml(state.allies[i].attack)}</span>
+                <span>素早さ ${escapeHtml(state.allies[i].speed)}</span>
+                <span>★${escapeHtml(state.allies[i].star)}</span>
+                <span>${escapeHtml(optionsLabel(MONSTER_ATTRIBUTE_OPTIONS, state.allies[i].attribute))}属性</span>
+              </div>` : `
+              <label class="mini-field"><span>攻撃力</span><input class="ally-attack" type="number" inputmode="decimal" min="0" step="0.1" value="${escapeHtml(state.allies[i].attack)}"></label>
+              <label class="mini-field"><span>素早さ</span><input class="ally-speed" type="number" inputmode="decimal" min="0" step="0.1" value="${escapeHtml(state.allies[i].speed)}"></label>
+              <label class="mini-field"><span>★の数</span><input class="ally-star" type="number" inputmode="numeric" min="1" max="4" step="1" value="${escapeHtml(state.allies[i].star ?? '')}"></label>
+              <label class="mini-field"><span>属性</span><select class="ally-attribute">${optionsHtml(MONSTER_ATTRIBUTE_OPTIONS, state.allies[i].attribute ?? '')}</select></label>`}
           </div>`).join('')}
       </div>
     </section>
@@ -817,7 +846,9 @@ function collectStateFromDom() {
     state.allies[i].characterId = card.querySelector('.ally-character')?.value ?? state.allies[i].characterId ?? '';
     state.allies[i].attack = card.querySelector('.ally-attack')?.value ?? state.allies[i].attack;
     state.allies[i].speed = card.querySelector('.ally-speed')?.value ?? state.allies[i].speed;
-    rememberCharacterStats(state.allies[i]);
+    state.allies[i].star = card.querySelector('.ally-star')?.value ?? state.allies[i].star ?? '';
+    state.allies[i].attribute = card.querySelector('.ally-attribute')?.value ?? state.allies[i].attribute ?? '';
+    if (!state.allies[i].characterId) rememberCharacterStats(state.allies[i]);
   });
 
   root.querySelectorAll('.action-card').forEach(card => {
@@ -843,20 +874,23 @@ function collectStateFromDom() {
     } else {
       const allyIndex = Number(actorKey.replace('ally', ''));
       const action = state.turns[turnIndex].allyActions[allyIndex];
-      action.kind = card.querySelector('.action-kind')?.value ?? action.kind;
-      action.skillPresetId = card.querySelector('.skill-preset')?.value ?? action.skillPresetId ?? '';
-      action.skillMultiplier = card.querySelector('.skill-multiplier')?.value ?? action.skillMultiplier;
-      action.skillMultiplierMin = card.querySelector('.skill-multiplier-min')?.value ?? action.skillMultiplierMin ?? '';
-      action.skillMultiplierMax = card.querySelector('.skill-multiplier-max')?.value ?? action.skillMultiplierMax ?? '';
-      action.skillMultiplierStep = card.querySelector('.skill-multiplier-step')?.value ?? action.skillMultiplierStep ?? '';
-      action.attackAttribute = card.querySelector('.attack-attribute')?.value ?? action.attackAttribute;
-      action.attackAttribute2 = card.querySelector('.attack-attribute2')?.value ?? action.attackAttribute2 ?? 'none';
-      action.attackType = card.querySelector('.attack-type')?.value ?? action.attackType ?? 'physical';
-      action.hits = card.querySelector('.hit-count')?.value ?? action.hits;
-      action.hitsMin = card.querySelector('.hit-count-min')?.value ?? action.hitsMin ?? '';
-      action.hitsMax = card.querySelector('.hit-count-max')?.value ?? action.hitsMax ?? '';
-      action.buff = collectPrimaryBuff(card, 'ally', action.buff);
-      action.effects = collectEffects(card);
+      const selectedPresetId = card.querySelector('.skill-preset')?.value ?? action.skillPresetId ?? '';
+      action.skillPresetId = selectedPresetId;
+      if (!selectedPresetId) {
+        action.kind = card.querySelector('.action-kind')?.value ?? action.kind;
+        action.skillMultiplier = card.querySelector('.skill-multiplier')?.value ?? action.skillMultiplier;
+        action.skillMultiplierMin = card.querySelector('.skill-multiplier-min')?.value ?? action.skillMultiplierMin ?? '';
+        action.skillMultiplierMax = card.querySelector('.skill-multiplier-max')?.value ?? action.skillMultiplierMax ?? '';
+        action.skillMultiplierStep = card.querySelector('.skill-multiplier-step')?.value ?? action.skillMultiplierStep ?? '';
+        action.attackAttribute = card.querySelector('.attack-attribute')?.value ?? action.attackAttribute;
+        action.attackAttribute2 = card.querySelector('.attack-attribute2')?.value ?? action.attackAttribute2 ?? 'none';
+        action.attackType = card.querySelector('.attack-type')?.value ?? action.attackType ?? 'physical';
+        action.hits = card.querySelector('.hit-count')?.value ?? action.hits;
+        action.hitsMin = card.querySelector('.hit-count-min')?.value ?? action.hitsMin ?? '';
+        action.hitsMax = card.querySelector('.hit-count-max')?.value ?? action.hitsMax ?? '';
+        action.buff = collectPrimaryBuff(card, 'ally', action.buff);
+        action.effects = collectEffects(card);
+      }
     }
   });
 }

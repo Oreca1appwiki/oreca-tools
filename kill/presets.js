@@ -1,7 +1,7 @@
 // 撃破確率ツール用の技プリセット。
 // 倍率は属性補正・種族補正を掛ける前の技倍率。
 // majorGroup がある技だけを「主要技プリセット」に表示する。
-// キャラクタープリセット専用技は同じデータを使って自動入力するが、主要技一覧には表示しない。
+// モンスタープリセットで使う技も同じデータを使い、主要技一覧の「その他」から選択できる。
 
 const attack = (id, name, {
   multiplier = '100', attribute = 'none', attribute2 = 'none', attackType = 'physical', hits = '1',
@@ -35,8 +35,8 @@ export const SKILL_PRESETS = Object.freeze([
 
   // バフ / 強化技
   major(buff('loki_brand', 'ロキブランド',
-    { type: 'atkBuff', target: 'all', mode: 'mult', value: '150', duration: '2' },
-    [], '対象はデフォルトで全員（3体編成なら1/2/3）。手動変更できます。'), 'buff'),
+    { type: 'atkBuff', target: 'star4', mode: 'mult', value: '150', duration: '2' },
+    [], '味方の★4モンスターを自動で対象にします。'), 'buff'),
   major(buff('oni_spirit', '鬼の気合入れ',
     { type: 'atkBuff', target: 'self', mode: 'mult', value: '200', duration: '1' }), 'buff'),
   major(buff('sea_king_gaze', '海王のまなざし',
@@ -49,8 +49,8 @@ export const SKILL_PRESETS = Object.freeze([
   major(buff('growl', 'うなる',
     { type: 'atkBuff', target: 'self', mode: 'mult', value: '150', duration: '3' }), 'buff'),
   major(buff('sun_hymn', '太陽讃歌',
-    { type: 'atkBuff', target: ['ally1', 'ally2'], mode: 'add', value: '50', duration: '3' },
-    [], '本来は自軍の火属性が対象です。デフォルト対象は1/2。味方属性入力がないため必要に応じて手動変更してください。'), 'buff'),
+    { type: 'atkBuff', target: 'fireAllies', mode: 'add', value: '50', duration: '3' },
+    [], '味方の火属性モンスターを自動で対象にします。'), 'buff'),
   major(buff('item_parts', 'アイテムパーツ',
     { type: 'atkBuff', target: 'self', mode: 'add', value: '25', duration: '3' },
     [{ type: 'speedBuff', target: 'self', mode: 'add', value: '60', duration: '3' }],
@@ -193,29 +193,29 @@ export const SKILL_PRESETS = Object.freeze([
   major(effectOnly('epidemic_glass', '悪疫グラス', [{ type: 'poisonToDeadly' }], '撃破確率計算では毒→猛毒のみ反映。'), 'other'),
 
   // ---------------------------------------------------------------------------
-  // キャラクタープリセット専用技。
-  // 主要技ではないため majorGroup を付けず、主要技ドロップダウンには出さない。
+  // モンスタープリセット由来の補助技。
+  // 主要な周回技ではないが、キャラ選択時の自動入力名をそのまま表示できるよう「その他」に公開する。
   // ---------------------------------------------------------------------------
-  attack('foot_sweep', '足ばらい', {
+  major(attack('foot_sweep', '足ばらい', {
     multiplier: '40', attribute: 'none', attackType: 'physical',
     effects: [{ type: 'defenseDown', mode: 'mult', value: '20', duration: '99', expiry: 'sourceNextActionStart' }],
     note: '敵の被ダメージ1.2倍。使用者の次の行動開始まで。'
-  }),
-  attack('shibire_giri', 'シビレ斬り', {
+  }), 'other'),
+  major(attack('shibire_giri', 'シビレ斬り', {
     multiplier: '100', attribute: 'poison', attackType: 'physical',
     note: '麻痺30%は撃破確率計算では未反映。'
-  }),
-  attack('attack_bang', 'こうげき!', { multiplier: '100', attribute: 'none', attackType: 'physical' }),
-  attack('dragon_tail', '竜のしっぽ', { multiplier: '90', attribute: 'none', attackType: 'physical' }),
-  attack('aqua_breath', 'アクアブレス', { multiplier: '105', attribute: 'water', attackType: 'other' }),
-  attack('shining_breath', 'シャイニングブレス', { multiplier: '105', attribute: 'light', attackType: 'other' }),
-  attack('fire1', 'ファイア!', { multiplier: '100', attribute: 'fire', attackType: 'magic' }),
-  attack('ice1', 'アイス!', { multiplier: '100', attribute: 'ice', attackType: 'magic' }),
-  attack('thunder1', 'サンダー!', { multiplier: '100', attribute: 'thunder', attackType: 'magic' }),
-  attack('meteor', 'メテオ!', { multiplier: '160', attribute: 'all', attackType: 'magic' }),
-  attack('purifying_flame', '浄化の炎', { multiplier: '50', undeadSkillMultiplier: '170', attribute: 'fire', attribute2: 'holy', attackType: 'magic' }),
-  attack('shiden', '紫電', { multiplier: '200', attribute: 'thunder', attackType: 'physical' }),
-  attack('critical_hit', '会心の一撃', { multiplier: '200', attribute: 'none', attackType: 'physical' })
+  }), 'other'),
+  major(attack('attack_bang', 'こうげき！', { multiplier: '100', attribute: 'none', attackType: 'physical' }), 'other'),
+  major(attack('dragon_tail', '竜のしっぽ', { multiplier: '90', attribute: 'none', attackType: 'physical' }), 'other'),
+  major(attack('aqua_breath', 'アクアブレス', { multiplier: '105', attribute: 'water', attackType: 'other' }), 'other'),
+  major(attack('shining_breath', 'シャイニングブレス', { multiplier: '105', attribute: 'light', attackType: 'other' }), 'other'),
+  major(attack('fire1', 'ファイア！', { multiplier: '100', attribute: 'fire', attackType: 'magic' }), 'other'),
+  major(attack('ice1', 'アイス！', { multiplier: '100', attribute: 'ice', attackType: 'magic' }), 'other'),
+  major(attack('thunder1', 'サンダー！', { multiplier: '100', attribute: 'thunder', attackType: 'magic' }), 'other'),
+  major(attack('meteor', 'メテオ！', { multiplier: '160', attribute: 'all', attackType: 'magic' }), 'other'),
+  major(attack('purifying_flame', '浄化の炎', { multiplier: '50', undeadSkillMultiplier: '170', attribute: 'fire', attribute2: 'holy', attackType: 'magic' }), 'other'),
+  major(attack('shiden', '紫電', { multiplier: '200', attribute: 'thunder', attackType: 'physical' }), 'other'),
+  major(attack('critical_hit', '会心の一撃', { multiplier: '200', attribute: 'none', attackType: 'physical' }), 'other')
 ]);
 
 export const SKILL_PRESET_BY_ID = new Map(SKILL_PRESETS.map(p => [p.id, p]));
