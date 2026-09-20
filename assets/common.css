@@ -311,3 +311,109 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px c
   font-size: 13px;
   pointer-events: none;
 }
+
+/* v0.5.0: 最適遭遇条件 */
+.encounter-shell { width: min(920px, 100%); }
+.encounter-input-grid { grid-template-columns: minmax(150px, .7fr) minmax(0, 1.3fr); }
+.encounter-target-field { margin-top: 12px; }
+.encounter-result { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); }
+.encounter-result-main .result-number { font-size: clamp(30px, 8vw, 46px); }
+.encounter-result-condition { display: flex; flex-direction: column; justify-content: center; }
+.encounter-condition { margin-top: 5px; font-size: clamp(18px, 4vw, 24px); line-height: 1.35; }
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.encounter-table-wrap { margin-top: 12px; }
+.encounter-table { width: 100%; border-collapse: collapse; min-width: 520px; }
+.encounter-table th, .encounter-table td { padding: 10px 9px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; vertical-align: middle; }
+.encounter-table th { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.encounter-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.encounter-table tr:last-child td { border-bottom: 0; }
+.encounter-detail-table { min-width: 650px; }
+.encounter-detail-table .is-best { background: var(--accent-soft); font-weight: 700; }
+.detail-table-wrap { margin-top: 14px; }
+
+@media (max-width: 560px) {
+  .encounter-input-grid { grid-template-columns: 1fr; }
+  .encounter-result { grid-template-columns: 1fr; }
+  .encounter-result .result-meta { grid-column: 1; }
+  .encounter-table th, .encounter-table td { padding: 9px 7px; }
+}
+
+/* v0.5.1: 技発動率計算 */
+.skill-shell { width: min(1040px, 100%); }
+.skill-condition-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.toggle-card {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 10px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+.toggle-card input { width: auto; min-height: 0; margin: 0; }
+.toggle-card span { display: grid; gap: 1px; }
+.toggle-card small { color: var(--muted); font-size: 10px; }
+.skill-reel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.skill-reel-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  min-width: 0;
+}
+.skill-reel-card h3 { text-align: center; margin-bottom: 7px; }
+.skill-slot-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  margin-top: 5px;
+}
+.skill-slot-row > span { color: var(--muted); font-size: 11px; text-align: right; }
+.skill-slot-row select { min-height: 36px; padding: 5px 7px; font-size: 12px; }
+.action-panel { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.primary-button {
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 8px 18px;
+  background: var(--accent);
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+.error-box {
+  flex: 1 1 100%;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+  color: var(--danger);
+  font-size: 12px;
+}
+.skill-result-panel { display: grid; gap: 14px; }
+.skill-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.skill-summary-grid .result-card small { display: block; color: var(--muted); margin-top: 5px; font-size: 11px; }
+.skill-result-number { display: block; margin-top: 4px; font-size: clamp(23px, 6vw, 34px); font-variant-numeric: tabular-nums; }
+.skill-result-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.skill-result-table th, .skill-result-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+.skill-result-table th { color: var(--muted); font-size: 11px; }
+.skill-result-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.result-subtitle { margin-top: 2px; }
+
+@media (max-width: 760px) {
+  .skill-condition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .skill-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .skill-condition-grid { grid-template-columns: 1fr; }
+  .skill-reel-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+  .skill-reel-card { padding: 8px; }
+  .skill-slot-row { grid-template-columns: 16px minmax(0, 1fr); gap: 4px; }
+  .skill-slot-row select { font-size: 11px; padding-left: 5px; padding-right: 5px; }
+  .skill-summary-grid { grid-template-columns: 1fr 1fr; }
+}

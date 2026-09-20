@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="ORECA Tools" />
+  <title>最適遭遇条件 - ORECA Tools</title>
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../icons/icon-180.png" />
+  <link rel="stylesheet" href="../assets/common.css" />
+</head>
+<body>
+  <div class="app-shell encounter-shell">
+    <a class="back-link" href="../">← ツール一覧</a>
+    <header class="tool-header">
+      <div>
+        <div class="eyebrow">ENCOUNTER OPTIMIZER</div>
+        <h1>最適遭遇条件</h1>
+        <p>指定した敵モンスター／敵パーティが候補一覧に入る確率を最大にする★合計を調べます。</p>
+      </div>
+    </header>
+
+    <main class="tool-root">
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <h2>対象</h2>
+            <p>Lv合計は30（Lv10×3）固定。★合計3～12を全探索します。</p>
+          </div>
+        </div>
+
+        <div class="field-grid encounter-input-grid">
+          <label class="field">
+            <span class="field-label">対象の種類</span>
+            <select id="targetKind">
+              <option value="monster">モンスター</option>
+              <option value="party">パーティ</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">名前で絞り込み</span>
+            <input id="targetSearch" type="search" autocomplete="off" placeholder="例：マシュまろ" />
+          </label>
+        </div>
+
+        <label class="field encounter-target-field">
+          <span class="field-label" id="targetSelectLabel">モンスター</span>
+          <select id="targetSelect">
+            <option value="">選択してください</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="result-panel encounter-result" id="summaryPanel" aria-live="polite">
+        <div class="result-card encounter-result-main">
+          <span class="result-label">最大出現確率</span>
+          <strong class="result-number" id="bestProbability">—</strong>
+        </div>
+        <div class="result-card encounter-result-condition">
+          <span class="result-label">最適条件</span>
+          <strong class="encounter-condition" id="bestCondition">対象を選択</strong>
+        </div>
+        <div class="result-meta" id="bestMeta">Lv合計30固定</div>
+      </section>
+
+      <section class="panel" id="chapterPanel" hidden>
+        <div class="section-heading">
+          <div>
+            <h2>章ごとの最適条件</h2>
+            <p>同じ対象が複数章に出る場合は章ごとに表示します。</p>
+          </div>
+        </div>
+        <div class="table-scroll encounter-table-wrap">
+          <table class="encounter-table">
+            <thead>
+              <tr>
+                <th>章</th>
+                <th>最適★合計</th>
+                <th>最大出現確率</th>
+              </tr>
+            </thead>
+            <tbody id="chapterResults"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <details class="panel details-panel" id="detailPanel" hidden>
+        <summary>★合計3～12の比較</summary>
+        <div class="table-scroll encounter-table-wrap detail-table-wrap">
+          <table class="encounter-table encounter-detail-table">
+            <thead id="detailHead"></thead>
+            <tbody id="detailBody"></tbody>
+          </table>
+        </div>
+      </details>
+
+      <details class="panel details-panel">
+        <summary>計算の前提</summary>
+        <div class="method-note">
+          <p>「出現確率」は、戦闘前に生成される敵候補一覧へ対象が1回以上含まれる確率です。候補から実際に選んで戦う確率ではありません。</p>
+          <p>全パーティ解禁・条件モンスターなしを基礎条件とし、Normal／Rare／通常Boss／独立ランダムBoss、初回Normalの乱数偏り、隣接★帯Normalを統合して計算します。</p>
+        </div>
+      </details>
+    </main>
+
+    <footer class="site-footer">Version <span data-app-version></span></footer>
+  </div>
+
+  <script type="module" src="../assets/pwa.js"></script>
+  <script type="module" src="./ui.js"></script>
+</body>
+</html>

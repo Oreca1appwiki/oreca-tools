@@ -17,8 +17,8 @@ import {
   presetIdForSkillName
 } from './presets.js';
 
-const STORAGE_KEY = 'oreca-tools.kill.v0.4.11';
-const DIRECT_STORAGE_KEYS = ['oreca-tools.kill.v0.4.10', 'oreca-tools.kill.v0.4.9'];
+const STORAGE_KEY = 'oreca-tools.kill.v0.4.12';
+const DIRECT_STORAGE_KEYS = ['oreca-tools.kill.v0.4.11', 'oreca-tools.kill.v0.4.10', 'oreca-tools.kill.v0.4.9'];
 // v0.4.5～v0.4.8 は攻撃力バフの乗算値を「増加量」で保存（50 = ×1.5）。
 // v0.4.9 からはダメージ計算と同じく最終倍率を直接保存（150 = ×1.5）。
 const AMOUNT_STORAGE_KEYS = ['oreca-tools.kill.v0.4.8', 'oreca-tools.kill.v0.4.7', 'oreca-tools.kill.v0.4.6', 'oreca-tools.kill.v0.4.5'];
@@ -109,7 +109,7 @@ const CHARACTER_USAGE_RANK = new Map(CHARACTER_USAGE_ORDER.map((id, i) => [id, i
 // 技もカテゴリ内で使用頻度順。忍法・ポイント・属性ブレス等の同系統は連続配置する。
 const SKILL_USAGE_ORDER = Object.freeze([
   // バフ・強化
-  'loki_brand','oni_spirit','spirit_blessing','sea_king_gaze','growl','sun_hymn','name_announcement','sword_dance','suck_dry',
+  'loki_brand','oni_spirit','spirit_blessing','sea_king_gaze','growl','sun_hymn','name_announcement','sword_dance','suck_dry','item_parts',
   // 攻撃
   'crush',
   'ninja_fire','ninja_water','ninja_wind',
@@ -121,7 +121,7 @@ const SKILL_USAGE_ORDER = Object.freeze([
   'rock_throw','dark_fire','venom_salamanda','bubble_grand','rengeki','roaring_lightning',
   'fire_torture','water_torture','tatsumaki','kamaitachi','rain_god_spear','marking_arrow','paralysis_arrow',
   'poison_crush','deadly_blow','ikazuchi','fire_ice_breath2','shout','headwind','heat_wave','ice_storm_strike',
-  'poison_bite','melting_breath',
+  'poison_bite','melting_breath','windmill',
   // その他
   'epidemic_glass'
 ]);
@@ -256,6 +256,7 @@ function normalizeState(saved, legacyAmounts = false, attackBuffAmountNotation =
         deadlyPoisonSkillMultiplier: raw.deadlyPoisonSkillMultiplier ?? '',
         weakDefenderAttribute: raw.weakDefenderAttribute ?? '',
         weakSkillMultiplier: raw.weakSkillMultiplier ?? '',
+        damageFormula: raw.damageFormula ?? '',
         buff: { ...defaultPrimaryBuff('ally'), ...(raw.buff ?? {}) },
         effects: Array.isArray(raw.effects) ? raw.effects : [],
         skillName: raw.skillName ?? ''
@@ -345,6 +346,7 @@ function resetAttackPresetFields(action) {
   action.deadlyPoisonSkillMultiplier = '';
   action.weakDefenderAttribute = '';
   action.weakSkillMultiplier = '';
+  action.damageFormula = '';
 }
 
 function applySkillPresetToAction(action, presetId) {
@@ -357,7 +359,10 @@ function applySkillPresetToAction(action, presetId) {
     return;
   }
   const skill = SKILL_PRESET_BY_ID.get(presetId);
-  if (!skill) return;
+  if (!skill) {
+    if (!presetId) action.damageFormula = '';
+    return;
+  }
 
   action.kind = skill.kind;
   action.skillName = skill.skillName;
@@ -381,6 +386,7 @@ function applySkillPresetToAction(action, presetId) {
     action.deadlyPoisonSkillMultiplier = skill.deadlyPoisonSkillMultiplier ?? '';
     action.weakDefenderAttribute = skill.weakDefenderAttribute ?? '';
     action.weakSkillMultiplier = skill.weakSkillMultiplier ?? '';
+    action.damageFormula = skill.damageFormula ?? '';
   } else if (skill.kind === 'buff') {
     action.buff = deepClone(skill.buff ?? defaultPrimaryBuff('ally'));
   }
@@ -614,19 +620,20 @@ function actionCardHtml(action, turnIndex, allyIndex) {
         <label class="mini-field"><span>主要技プリセット</span><select class="skill-preset">${skillPresetOptionsHtml(action.skillPresetId ?? '')}</select></label>
         ${presetMeta?.note ? `<p class="inline-note">${escapeHtml(presetMeta.note)}</p>` : ''}` : ''}
       ${action.kind === 'attack' ? `
+        ${action.damageFormula === 'windmill' ? `<p class="inline-note"><strong>風車式:</strong> 1発=ATK×0.6+SPD×0.15 / ヒット数=max(1, floor(SPD÷20))、最大10回。現在のバフ後ステータスで計算します。</p>` : ''}
         <div class="action-input-grid">
-          ${randomMultiplier ? `
+          ${action.damageFormula === 'windmill' ? '' : (randomMultiplier ? `
             <label class="mini-field"><span>技倍率 下限</span><div class="input-with-suffix"><input class="skill-multiplier-min" type="number" inputmode="decimal" step="0.1" min="0" value="${escapeHtml(action.skillMultiplierMin)}"><span class="suffix">%</span></div></label>
             <label class="mini-field"><span>技倍率 上限</span><div class="input-with-suffix"><input class="skill-multiplier-max" type="number" inputmode="decimal" step="0.1" min="0" value="${escapeHtml(action.skillMultiplierMax)}"><span class="suffix">%</span></div></label>
             <label class="mini-field"><span>倍率刻み</span><div class="input-with-suffix"><input class="skill-multiplier-step" type="number" inputmode="decimal" step="0.1" min="0.1" value="${escapeHtml(action.skillMultiplierStep || '0.1')}"><span class="suffix">%</span></div></label>` : `
-            <label class="mini-field"><span>技倍率</span><div class="input-with-suffix"><input class="skill-multiplier" type="number" inputmode="decimal" step="0.1" min="0" value="${escapeHtml(action.skillMultiplier)}"><span class="suffix">%</span></div></label>`}
+            <label class="mini-field"><span>技倍率</span><div class="input-with-suffix"><input class="skill-multiplier" type="number" inputmode="decimal" step="0.1" min="0" value="${escapeHtml(action.skillMultiplier)}"><span class="suffix">%</span></div></label>`)}
           <label class="mini-field"><span>技属性</span><select class="attack-attribute">${optionsHtml(ATTACK_ATTRIBUTES, action.attackAttribute)}</select></label>
           <label class="mini-field"><span>第2属性</span><select class="attack-attribute2">${optionsHtml(ATTACK_ATTRIBUTES, action.attackAttribute2 ?? 'none')}</select></label>
           ${state.enemy.race === 'undead' ? `<label class="mini-field"><span>技分類</span><select class="attack-type">${optionsHtml(ATTACK_TYPE_OPTIONS, action.attackType ?? 'physical')}</select></label>` : ''}
-          ${randomHits ? `
+          ${action.damageFormula === 'windmill' ? '' : (randomHits ? `
             <label class="mini-field"><span>ヒット数 下限</span><input class="hit-count-min" type="number" inputmode="numeric" step="1" min="1" max="50" value="${escapeHtml(action.hitsMin)}"></label>
             <label class="mini-field"><span>ヒット数 上限</span><input class="hit-count-max" type="number" inputmode="numeric" step="1" min="1" max="50" value="${escapeHtml(action.hitsMax)}"></label>` : `
-            <label class="mini-field"><span>ヒット数</span><input class="hit-count" type="number" inputmode="numeric" step="1" min="1" max="50" value="${escapeHtml(action.hits)}"></label>`}
+            <label class="mini-field"><span>ヒット数</span><input class="hit-count" type="number" inputmode="numeric" step="1" min="1" max="50" value="${escapeHtml(action.hits)}"></label>`)}
         </div>` : ''}
       ${action.kind === 'buff' ? primaryBuffHtml(action.buff, 'ally', false, allyIndex) : ''}
       ${action.kind === 'same' ? '<p class="same-action-note">前回の同モンスターの行動内容をそのまま使用します。</p>' : ''}

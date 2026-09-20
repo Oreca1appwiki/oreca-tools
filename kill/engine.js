@@ -1,4 +1,4 @@
-// 撃破確率シミュレータ v0.4.11
+// 撃破確率シミュレータ v0.4.12
 // 公開用の撃破確率計算に必要な戦闘要素だけを扱います。
 
 export const DEFENDER_ATTRIBUTES = Object.freeze([
@@ -97,6 +97,7 @@ function defaultAttackAction() {
     deadlyPoisonSkillMultiplier: '',
     weakDefenderAttribute: '',
     weakSkillMultiplier: '',
+    damageFormula: '',
     buff: defaultAllyBuff(),
     effects: []
   };
@@ -106,7 +107,7 @@ function defaultSkipAction() {
   return {
     kind: 'skip', skillMultiplier: '200', skillMultiplierMin: '', skillMultiplierMax: '', skillMultiplierStep: '',
     attackAttribute: 'none', attackAttribute2: 'none', attackType: 'physical', hits: '1', hitsMin: '', hitsMax: '',
-    undeadSkillMultiplier: '', poisonedSkillMultiplier: '', deadlyPoisonSkillMultiplier: '', weakDefenderAttribute: '', weakSkillMultiplier: '', buff: defaultAllyBuff(), effects: []
+    undeadSkillMultiplier: '', poisonedSkillMultiplier: '', deadlyPoisonSkillMultiplier: '', weakDefenderAttribute: '', weakSkillMultiplier: '', damageFormula: '', buff: defaultAllyBuff(), effects: []
   };
 }
 
@@ -178,7 +179,7 @@ export const DEFAULT_STATE = Object.freeze({
   ],
   turns: [{
     allyActions: [
-      { ...defaultAttackAction(), kind: 'buff', skillName: 'ロキブランド', buff: { type: 'atkBuff', target: 'self', mode: 'mult', value: '150', duration: '2' } },
+      { ...defaultAttackAction(), kind: 'buff', skillName: 'ロキブランド', buff: { type: 'atkBuff', target: 'all', mode: 'mult', value: '150', duration: '2' } },
       { ...defaultAttackAction(), kind: 'buff', skillName: '鬼の気合入れ', buff: { type: 'atkBuff', target: 'self', mode: 'mult', value: '200', duration: '1' } },
       { ...defaultSkipAction(), skillName: '' }
     ],
@@ -291,11 +292,17 @@ function attackAttributesFromConfig(config) {
 }
 
 function oneHitDistribution({
-  attack, skillMultiplier, attackAttribute, attackAttribute2, attackAttributes, defenderAttribute, defenderRace,
+  attack, speed = 0, skillMultiplier, damageFormula = '', attackAttribute, attackAttribute2, attackAttributes, defenderAttribute, defenderRace,
   attackType, defenseMods, weaknessBoost
 }) {
-  let base = mulPercentTrunc(attack, skillMultiplier);
-  if (base === null) throw new Error('技倍率が不正です');
+  let base;
+  if (damageFormula === 'windmill') {
+    // アプリ版Wiki: 風車は1発あたり 攻撃×0.6 + 素早さ×0.15。
+    base = trunc0(attack * 0.6 + speed * 0.15);
+  } else {
+    base = mulPercentTrunc(attack, skillMultiplier);
+    if (base === null) throw new Error('技倍率が不正です');
+  }
   for (const attr of attackAttributesFromConfig({ attackAttribute, attackAttribute2, attackAttributes })) {
     const coefficient = boostedAttrCoefficient(attrCoefficient(attr, defenderAttribute), weaknessBoost);
     base = trunc0(base * coefficient / 1000);
@@ -349,8 +356,14 @@ function averageDistributions(distributions) {
 }
 
 export function attackDamageDistribution(config) {
-  parseNumber(config.skillMultiplier, '技倍率', { min: 0 });
-  const fixedMultiplier = String(config.skillMultiplier);
+  const damageFormula = config.damageFormula ?? '';
+  if (damageFormula === 'windmill') {
+    parseNumber(config.attack, '攻撃力', { min: 0 });
+    parseNumber(config.speed ?? 0, '素早さ', { min: 0 });
+  } else {
+    parseNumber(config.skillMultiplier, '技倍率', { min: 0 });
+  }
+  const fixedMultiplier = String(config.skillMultiplier ?? '100');
   const hasMultiplierRange = config.skillMultiplierMin !== '' && config.skillMultiplierMin != null
     && config.skillMultiplierMax !== '' && config.skillMultiplierMax != null;
   let multipliers = [fixedMultiplier];
@@ -360,10 +373,13 @@ export function attackDamageDistribution(config) {
     parseNumber(config.skillMultiplierStep || '0.1', '技倍率刻み', { min: 0.000001 });
     multipliers = decimalRange(config.skillMultiplierMin, config.skillMultiplierMax, config.skillMultiplierStep || '0.1');
   }
-  const one = averageDistributions(multipliers.map(skillMultiplier => oneHitDistribution({ ...config, skillMultiplier })));
+  const one = averageDistributions(multipliers.map(skillMultiplier => oneHitDistribution({ ...config, skillMultiplier, damageFormula })));
 
-  const fixedHits = parseIntValue(config.hits, 'ヒット数', { min: 1, max: 50 });
-  const hasHitRange = config.hitsMin !== '' && config.hitsMin != null && config.hitsMax !== '' && config.hitsMax != null;
+  const dynamicWindmillHits = damageFormula === 'windmill'
+    ? Math.max(1, Math.min(10, Math.floor(parseNumber(config.speed ?? 0, '素早さ', { min: 0 }) / 20)))
+    : null;
+  const fixedHits = dynamicWindmillHits ?? parseIntValue(config.hits, 'ヒット数', { min: 1, max: 50 });
+  const hasHitRange = damageFormula !== 'windmill' && config.hitsMin !== '' && config.hitsMin != null && config.hitsMax !== '' && config.hitsMax != null;
   let hitCounts = [fixedHits];
   if (hasHitRange) {
     const minHits = parseIntValue(config.hitsMin, '最小ヒット数', { min: 1, max: 50 });
@@ -644,6 +660,7 @@ function ensureAction(action, side = 'ally') {
     deadlyPoisonSkillMultiplier: action?.deadlyPoisonSkillMultiplier ?? '',
     weakDefenderAttribute: action?.weakDefenderAttribute ?? '',
     weakSkillMultiplier: action?.weakSkillMultiplier ?? '',
+    damageFormula: action?.damageFormula ?? '',
     buff: { ...defaultBuff, ...(action?.buff ?? {}) },
     effects: Array.isArray(action?.effects) ? action.effects : [],
     skillName: action?.skillName ?? ''
@@ -725,9 +742,16 @@ export function simulateKillProbability(state) {
           if (runtime.enemy.race === 'undead' && action.undeadSkillMultiplier !== '') skillMultiplier = action.undeadSkillMultiplier;
           if (runtime.enemy.poison !== 'none' && action.poisonedSkillMultiplier !== '') skillMultiplier = action.poisonedSkillMultiplier;
           if (runtime.enemy.poison === 'deadlyPoison' && action.deadlyPoisonSkillMultiplier !== '') skillMultiplier = action.deadlyPoisonSkillMultiplier;
+          const speed = applyMods(
+            runtime.allies[actor.index].baseSpeed,
+            runtime.allies[actor.index].speedMods,
+            { clampMin: 0, clampMax: 999 }
+          );
           const damageDist = attackDamageDistribution({
             attack,
+            speed,
             skillMultiplier,
+            damageFormula: action.damageFormula,
             skillMultiplierMin: action.skillMultiplierMin,
             skillMultiplierMax: action.skillMultiplierMax,
             skillMultiplierStep: action.skillMultiplierStep,

@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111827" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="ORECA Tools" />
+  <title>技発動率計算 - ORECA Tools</title>
+  <link rel="manifest" href="../manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="../icons/icon-180.png" />
+  <link rel="stylesheet" href="../assets/common.css" />
+</head>
+<body>
+  <div class="app-shell skill-shell">
+    <a class="back-link" href="../">← ツール一覧</a>
+    <header class="tool-header">
+      <div>
+        <div class="eyebrow">COMMAND PROBABILITY</div>
+        <h1>技発動率計算</h1>
+        <p>コマンドリールを入力し、目当ての技の発動回数・到達確率を計算します。</p>
+      </div>
+    </header>
+
+    <main class="tool-root">
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <h2>計算条件</h2>
+            <p>通常は最大4リール、BOSSは最大8リール、シモンは3リール固定です。</p>
+          </div>
+        </div>
+
+        <div class="field-grid skill-condition-grid">
+          <label class="field">
+            <span class="field-label">計算モード</span>
+            <select id="calcMode">
+              <option value="fixed">Nターン後の発動回数</option>
+              <option value="target">目標回数発動まで</option>
+              <option value="change_monkey">変化発動率（猿）</option>
+              <option value="change_bull">変化発動率（牛）</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">技発動後の処理</span>
+            <select id="processMode"></select>
+          </label>
+          <label class="field" id="turnField">
+            <span class="field-label">ターン数</span>
+            <input id="turnCount" type="number" min="1" max="10" step="1" value="1" />
+          </label>
+          <label class="field" id="targetField" hidden>
+            <span class="field-label">目標発動回数</span>
+            <input id="targetCount" type="number" min="1" step="1" value="1" />
+          </label>
+          <label class="field" id="exField" hidden>
+            <span class="field-label">初期EXゲージ</span>
+            <input id="initialEx" type="number" min="0" max="10" step="1" value="0" />
+          </label>
+          <label class="field">
+            <span class="field-label">使用リール数</span>
+            <select id="reelCount"></select>
+          </label>
+          <label class="toggle-card" id="bossField">
+            <input id="bossMode" type="checkbox" />
+            <span><b>BOSS</b><small>最大8リール</small></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-heading">
+          <div>
+            <h2>コマンドリール</h2>
+            <p>各リール6マスを上から順に入力します。「上がる」は次のリールへ移動、「★へ戻る」は★リールへ戻る動作です。</p>
+          </div>
+          <button class="ghost-button" id="fillMiss" type="button">全てミス</button>
+        </div>
+        <div class="skill-reel-grid" id="reelGrid"></div>
+      </section>
+
+      <section class="panel action-panel">
+        <button class="primary-button" id="calculate" type="button">計算する</button>
+        <button class="ghost-button" id="reset" type="button">リセット</button>
+        <div class="error-box" id="errorBox" hidden></div>
+      </section>
+
+      <section class="panel skill-result-panel" id="resultPanel" hidden aria-live="polite">
+        <div id="resultSummary" class="skill-summary-grid"></div>
+        <div id="resultDetail"></div>
+      </section>
+
+      <details class="panel details-panel">
+        <summary>特殊処理の仕様</summary>
+        <div class="method-note">
+          <p><b>ミスに変化</b>：目当ての技が発動したマスを以後ミスとして扱います。</p>
+          <p><b>ミスに変化+再行動</b>：発動したマスをミス化して同じターン内に再行動します。次ターン開始時には元の構成へ戻ります。</p>
+          <p><b>シモン</b>：投げナイフはEX−1・70%、投げオノはEX−2・150%、悪魔の心臓はEX+3かつ消費したナイフ／オノを復元します。</p>
+          <p><b>ロック</b>：パンチコンボ60%、キックコンボ80%、ゲットバックコンボ40%。コンボフィニッシャーは150%＋それまでのコンボ数×50%として計算します。</p>
+          <p><b>変化発動率</b>：猿／牛の固定コマンドによる指定ターン後の停止リール分布から、入力した目当ての技が次の行動で発動する確率を計算します。</p>
+        </div>
+      </details>
+    </main>
+
+    <footer class="site-footer">Version <span data-app-version></span></footer>
+  </div>
+  <script type="module" src="../assets/pwa.js"></script>
+  <script type="module" src="./ui.js"></script>
+</body>
+</html>

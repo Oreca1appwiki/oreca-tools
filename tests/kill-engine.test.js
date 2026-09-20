@@ -208,9 +208,9 @@ console.log('kill-engine tests: OK');
 {
   const majorIds = new Set(SKILL_PRESETS.filter(x => x.major === true).map(x => x.id));
   for (const id of [
-    'loki_brand', 'oni_spirit', 'sea_king_gaze', 'spirit_blessing', 'growl', 'sun_hymn',
+    'loki_brand', 'oni_spirit', 'sea_king_gaze', 'spirit_blessing', 'growl', 'sun_hymn', 'item_parts',
     'sword_dance', 'name_announcement', 'fire2', 'fire3', 'aqua2', 'aqua3', 'wind2',
-    'marking_arrow', 'self_destruct', 'bubble_grand', 'rengeki',
+    'marking_arrow', 'self_destruct', 'bubble_grand', 'rengeki', 'windmill',
     'heat_wave', 'ice_storm_strike',
     'red_fire_breath', 'blue_aqua_breath', 'yellow_earth_breath', 'green_air_breath',
     'red_point_2', 'blue_point_2', 'yellow_point_2', 'green_point_2',
@@ -234,7 +234,7 @@ console.log('kill-engine tests: OK');
   assert.deepEqual(suck.buff, { type: 'atkBuff', target: 'self', mode: 'add', value: '15', duration: '3' });
 
   const loki = SKILL_PRESET_BY_ID.get('loki_brand');
-  assert.deepEqual(loki.buff, { type: 'atkBuff', target: 'self', mode: 'mult', value: '150', duration: '2' });
+  assert.deepEqual(loki.buff, { type: 'atkBuff', target: 'all', mode: 'mult', value: '150', duration: '2' });
   const gaze = SKILL_PRESET_BY_ID.get('sea_king_gaze');
   assert.deepEqual(gaze.buff, { type: 'atkBuff', target: 'self', mode: 'add', value: '30', duration: '99' });
 
@@ -476,4 +476,71 @@ console.log('kill-engine tests: OK');
 {
   const p = SKILL_PRESET_BY_ID.get('shibire_giri');
   assert.deepEqual([p.skillMultiplier, p.attackAttribute, p.attackType], ['100','poison','physical']);
+}
+
+
+// 26) ロキブランドは全員、太陽讃歌は1/2がデフォルト対象。
+{
+  const loki = SKILL_PRESET_BY_ID.get('loki_brand');
+  const sun = SKILL_PRESET_BY_ID.get('sun_hymn');
+  assert.equal(loki.buff.target, 'all');
+  assert.deepEqual(sun.buff.target, ['ally1', 'ally2']);
+}
+
+// 27) アイテムパーツは自身の攻撃+25・素早さ+60を3ターン付与する。
+{
+  const p = SKILL_PRESET_BY_ID.get('item_parts');
+  assert.equal(p.major, true);
+  assert.deepEqual(p.buff, { type: 'atkBuff', target: 'self', mode: 'add', value: '25', duration: '3' });
+  assert.deepEqual(p.effects, [{ type: 'speedBuff', target: 'self', mode: 'add', value: '60', duration: '3' }]);
+}
+
+// 28) 風車はATK×0.6+SPD×0.15の1発威力、SPD20ごとにヒット数増加（最大10）。
+{
+  const p = SKILL_PRESET_BY_ID.get('windmill');
+  assert.deepEqual([p.damageFormula, p.attackAttribute, p.attackType], ['windmill', 'wind', 'physical']);
+  const dist = attackDamageDistribution({
+    attack: 57, speed: 84, skillMultiplier: '100', damageFormula: 'windmill',
+    attackAttribute: 'wind', attackAttribute2: 'none', attackType: 'physical',
+    defenderAttribute: 'fire', defenderRace: 'normal', defenseMods: [], weaknessBoost: false,
+    hits: '1', hitsMin: '', hitsMax: ''
+  });
+  // floor(57×0.6 + 84×0.15)=46 → 風弱点×1.5=69 → 1発65～72、SPD84で4ヒット。
+  assert.equal(Math.min(...dist.keys()), 260);
+  assert.equal(Math.max(...dist.keys()), 288);
+
+  const capped = attackDamageDistribution({
+    attack: 100, speed: 999, skillMultiplier: '100', damageFormula: 'windmill',
+    attackAttribute: 'none', attackAttribute2: 'none', attackType: 'physical',
+    defenderAttribute: 'fire', defenderRace: 'normal', defenseMods: [], weaknessBoost: false,
+    hits: '1', hitsMin: '', hitsMax: ''
+  });
+  // 10ヒット上限。1発の最低はfloor(floor(100×0.6+999×0.15)×0.95)=198。
+  assert.equal(Math.min(...capped.keys()), 1980);
+}
+
+// 29) アイテムパーツ後の風車は攻撃・素早さの両方の上昇を参照する。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy.attribute = 'fire';
+  s.enemy.maxHp = '500';
+  s.enemy.speed = '10';
+  s.allies[0].attack = '57';
+  s.allies[0].speed = '84';
+  s.turns[0].allyActions[0] = {
+    kind: 'buff',
+    buff: { type: 'atkBuff', target: 'self', mode: 'add', value: '25', duration: '3' },
+    effects: [{ type: 'speedBuff', target: 'self', mode: 'add', value: '60', duration: '3' }]
+  };
+  s.turns[0].enemyAction.enabled = false;
+  s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  s.turns[1].allyActions[0] = {
+    kind: 'attack', skillMultiplier: '100', damageFormula: 'windmill',
+    attackAttribute: 'wind', attackAttribute2: 'none', attackType: 'physical',
+    hits: '1', hitsMin: '', hitsMax: '', effects: []
+  };
+  const r = simulateKillProbability(s);
+  // ATK82・SPD144 -> 1発 floor(49.2+21.6)=70、風弱点105、7ヒット。最低各99で693なので500は確定撃破。
+  approx(r.killChance, 1);
 }

@@ -7,14 +7,14 @@ const attack = (id, name, {
   multiplier = '100', attribute = 'none', attribute2 = 'none', attackType = 'physical', hits = '1',
   multiplierMin = '', multiplierMax = '', multiplierStep = '', hitsMin = '', hitsMax = '',
   undeadSkillMultiplier = '', poisonedSkillMultiplier = '', deadlyPoisonSkillMultiplier = '',
-  weakDefenderAttribute = '', weakSkillMultiplier = '',
+  weakDefenderAttribute = '', weakSkillMultiplier = '', damageFormula = '',
   effects = [], note = '', selectable = true
 } = {}) => ({
   id, name, kind: 'attack', skillName: name, skillMultiplier: multiplier,
   attackAttribute: attribute, attackAttribute2: attribute2, attackType, hits,
   skillMultiplierMin: multiplierMin, skillMultiplierMax: multiplierMax, skillMultiplierStep: multiplierStep,
   hitsMin, hitsMax, undeadSkillMultiplier, poisonedSkillMultiplier, deadlyPoisonSkillMultiplier,
-  weakDefenderAttribute, weakSkillMultiplier, effects, note, selectable
+  weakDefenderAttribute, weakSkillMultiplier, damageFormula, effects, note, selectable
 });
 
 const buff = (id, name, buffData, effects = [], note = '', selectable = true) => ({
@@ -35,8 +35,8 @@ export const SKILL_PRESETS = Object.freeze([
 
   // バフ / 強化技
   major(buff('loki_brand', 'ロキブランド',
-    { type: 'atkBuff', target: 'self', mode: 'mult', value: '150', duration: '2' },
-    [], '対象は手動変更できます。'), 'buff'),
+    { type: 'atkBuff', target: 'all', mode: 'mult', value: '150', duration: '2' },
+    [], '対象はデフォルトで全員（3体編成なら1/2/3）。手動変更できます。'), 'buff'),
   major(buff('oni_spirit', '鬼の気合入れ',
     { type: 'atkBuff', target: 'self', mode: 'mult', value: '200', duration: '1' }), 'buff'),
   major(buff('sea_king_gaze', '海王のまなざし',
@@ -49,8 +49,12 @@ export const SKILL_PRESETS = Object.freeze([
   major(buff('growl', 'うなる',
     { type: 'atkBuff', target: 'self', mode: 'mult', value: '150', duration: '3' }), 'buff'),
   major(buff('sun_hymn', '太陽讃歌',
-    { type: 'atkBuff', target: 'self', mode: 'add', value: '50', duration: '3' },
-    [], '本来は自軍の火属性が対象です。味方属性入力がないため対象は手動変更してください。'), 'buff'),
+    { type: 'atkBuff', target: ['ally1', 'ally2'], mode: 'add', value: '50', duration: '3' },
+    [], '本来は自軍の火属性が対象です。デフォルト対象は1/2。味方属性入力がないため必要に応じて手動変更してください。'), 'buff'),
+  major(buff('item_parts', 'アイテムパーツ',
+    { type: 'atkBuff', target: 'self', mode: 'add', value: '25', duration: '3' },
+    [{ type: 'speedBuff', target: 'self', mode: 'add', value: '60', duration: '3' }],
+    '撃破確率計算では自身への攻撃+25・素早さ+60（3ターン）を反映します。最大HP+80、99加護、被ダメ30%カットは未反映です。'), 'buff'),
   major(buff('sword_dance', 'つるぎの舞',
     { type: 'atkBuff', target: 'others', mode: 'mult', value: '120', duration: '3' },
     [], '自身以外の味方を1.2倍。自動連続使用・被弾による解除はこのツールでは扱いません。'), 'buff'),
@@ -84,6 +88,10 @@ export const SKILL_PRESETS = Object.freeze([
   }), 'attack'),
   major(attack('peck_many', 'つつきまくり', {
     multiplier: '70', attribute: 'wind', attackType: 'physical', hits: '3'
+  }), 'attack'),
+  major(attack('windmill', '風車', {
+    multiplier: '100', attribute: 'wind', attackType: 'physical', hits: '1', damageFormula: 'windmill',
+    note: '1発の基礎威力=攻撃×0.6+素早さ×0.15。攻撃回数は素早さ39以下で1回、40で2回、以後20ごとに+1、最大10回。'
   }), 'attack'),
 
   // ファイア!! / アクア!! はユーザー指定により !!! 版も例外的に追加。

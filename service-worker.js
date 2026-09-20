@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oreca-tools-v0.4.11';
+const CACHE_NAME = 'oreca-tools-v0.5.1';
 const CORE = [
   './',
   './index.html',
@@ -14,6 +14,15 @@ const CORE = [
   './kill/ui.js',
   './kill/engine.js',
   './kill/presets.js',
+  './encounter/',
+  './encounter/index.html',
+  './encounter/ui.js',
+  './encounter/engine.js',
+  './encounter/data.js',
+  './skill/',
+  './skill/index.html',
+  './skill/ui.js',
+  './skill/engine.js',
   './manifest.webmanifest',
   './icons/icon-180.png',
   './icons/icon-192.png',
