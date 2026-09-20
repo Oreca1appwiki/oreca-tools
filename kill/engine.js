@@ -1,3 +1,5 @@
+import { activationTransitionsFor } from './commands.js';
+import { SKILL_PRESET_BY_ID } from './presets.js';
 // 撃破確率シミュレータ v0.4.12
 // 公開用の撃破確率計算に必要な戦闘要素だけを扱います。
 
@@ -173,9 +175,9 @@ export const DEFAULT_STATE = Object.freeze({
   },
   allyCount: 3,
   allies: [
-    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind' },
-    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire' },
-    { characterId: '', attack: '0', speed: '0', star: '', attribute: '' }
+    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind', commandVariant: '' },
+    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire', commandVariant: '' },
+    { characterId: '', attack: '0', speed: '0', star: '', attribute: '', commandVariant: '' }
   ],
   turns: [{
     allyActions: [
@@ -666,7 +668,8 @@ function ensureAction(action, side = 'ally') {
     damageFormula: action?.damageFormula ?? '',
     buff: { ...defaultBuff, ...(action?.buff ?? {}) },
     effects: Array.isArray(action?.effects) ? action.effects : [],
-    skillName: action?.skillName ?? ''
+    skillName: action?.skillName ?? '',
+    presetTarget: action?.presetTarget ?? ''
   };
 }
 
@@ -685,7 +688,7 @@ function resolveAction(turns, turnIndex, side, actorIndex = -1) {
   return { action: ensureAction({ kind: 'skip' }, side), repeated: true };
 }
 
-export function simulateKillProbability(state) {
+function simulateKillProbabilityLegacy(state) {
   const maxHp = parseIntValue(state.enemy?.maxHp, '敵HP', { min: 1, max: 9999999 });
   const enemyBaseSpeed = parseNumber(state.enemy?.speed, '敵の素早さ', { min: 0 });
   const allyCount = parseIntValue(state.allyCount, '味方人数', { min: 1, max: 3 });
@@ -842,4 +845,215 @@ export function simulateKillProbability(state) {
   }
 
   return { killChance: killChance(hpDist), hpDistribution: hpDist, timeline, finalTurn: turns.length, finalOrder: [] };
+}
+
+
+function cloneRuntimeState(runtime) {
+  return JSON.parse(JSON.stringify(runtime));
+}
+
+function scaleDistribution(dist, factor) {
+  if (factor === 1) return new Map(dist);
+  const out = new Map();
+  for (const [hp, p] of dist) out.set(hp, p * factor);
+  return out;
+}
+
+function addDistribution(into, from) {
+  for (const [hp, p] of from) into.set(hp, (into.get(hp) ?? 0) + p);
+}
+
+function runtimeScenarioKey(runtime, reels) {
+  return JSON.stringify({ runtime, reels });
+}
+
+function mergeScenarios(scenarios) {
+  const byKey = new Map();
+  for (const sc of scenarios) {
+    const key = runtimeScenarioKey(sc.runtime, sc.reels);
+    const existing = byKey.get(key);
+    if (existing) addDistribution(existing.hpDist, sc.hpDist);
+    else byKey.set(key, { runtime: sc.runtime, reels: sc.reels.slice(), hpDist: new Map(sc.hpDist), order: sc.order });
+  }
+  return [...byKey.values()];
+}
+
+function combinedHpDistribution(scenarios) {
+  const out = new Map();
+  for (const sc of scenarios) addDistribution(out, sc.hpDist);
+  return out;
+}
+
+function applyActivatedAllyAction(runtime, hpDist, action, actorIndex, state) {
+  let nextHp = hpDist;
+  if (action.kind === 'attack') {
+    const attack = applyMods(runtime.allies[actorIndex].baseAttack, runtime.allies[actorIndex].attackMods, { clampMin: 1, clampMax: 999 });
+    let skillMultiplier = action.skillMultiplier;
+    if (action.weakDefenderAttribute && action.weakSkillMultiplier !== '' && state.enemy?.attribute === action.weakDefenderAttribute) skillMultiplier = action.weakSkillMultiplier;
+    if (runtime.enemy.race === 'undead' && action.undeadSkillMultiplier !== '') skillMultiplier = action.undeadSkillMultiplier;
+    if (runtime.enemy.poison !== 'none' && action.poisonedSkillMultiplier !== '') skillMultiplier = action.poisonedSkillMultiplier;
+    if (runtime.enemy.poison === 'deadlyPoison' && action.deadlyPoisonSkillMultiplier !== '') skillMultiplier = action.deadlyPoisonSkillMultiplier;
+    const speed = applyMods(runtime.allies[actorIndex].baseSpeed, runtime.allies[actorIndex].speedMods, { clampMin: 0, clampMax: 999 });
+    const damageDist = attackDamageDistribution({
+      attack, speed, skillMultiplier, damageFormula: action.damageFormula,
+      skillMultiplierMin: action.skillMultiplierMin, skillMultiplierMax: action.skillMultiplierMax, skillMultiplierStep: action.skillMultiplierStep,
+      attackAttribute: action.attackAttribute, attackAttribute2: action.attackAttribute2, attackType: action.attackType,
+      defenderAttribute: state.enemy?.attribute ?? 'none', defenderRace: runtime.enemy.race,
+      defenseMods: runtime.enemy.defenseMods, weaknessBoost: runtime.allies[actorIndex].weaknessMods.length > 0,
+      hits: action.hits, hitsMin: action.hitsMin, hitsMax: action.hitsMax
+    });
+    nextHp = applyAttackToHp(nextHp, damageDist);
+  } else if (action.kind === 'buff') {
+    allyEffect(runtime, action.buff, actorIndex);
+  }
+
+  const preset = SKILL_PRESET_BY_ID.get(action.skillPresetId ?? '');
+  if (preset?.reelBoost) {
+    const target = action.presetTarget ?? `ally${Math.min(actorIndex + 1, runtime.allyCount)}`;
+    const ids = resolvedTargetIdsRuntime(runtime, target, actorIndex);
+    for (const id of ids) {
+      const idx = Number(id.replace('ally','')) - 1;
+      runtime.pendingReelBoosts ??= [];
+      runtime.pendingReelBoosts.push({ index: idx, amount: Number(preset.reelBoost) });
+    }
+  }
+
+  if (action.kind !== 'skip') {
+    for (const effect of action.effects ?? []) allyEffect(runtime, effect, actorIndex);
+  }
+  return nextHp;
+}
+
+function resolvedTargetIdsRuntime(runtime, target, actorIndex = 0) {
+  if (Array.isArray(target)) return target.filter(x => /^ally[1-3]$/.test(x));
+  if (target === 'all') return Array.from({ length: runtime.allyCount }, (_, i) => `ally${i + 1}`);
+  if (target === 'self') return [`ally${actorIndex + 1}`];
+  if (target === 'others') return Array.from({ length: runtime.allyCount }, (_, i) => `ally${i + 1}`).filter(x => x !== `ally${actorIndex + 1}`);
+  if (/^ally[1-3]$/.test(target ?? '')) return [target];
+  return [];
+}
+
+function applyPendingReelBoosts(runtime, reels) {
+  if (!runtime.pendingReelBoosts?.length) return;
+  for (const b of runtime.pendingReelBoosts) reels[b.index] = Math.max(0, Math.min(3, (reels[b.index] ?? 0) + b.amount));
+  runtime.pendingReelBoosts = [];
+}
+
+function hasAnyActivationModel(state) {
+  const turns = Array.isArray(state.turns) ? state.turns : [];
+  for (let i = 0; i < Number(state.allyCount ?? 0); i++) {
+    const characterId = state.allies?.[i]?.characterId;
+    if (!characterId) continue;
+    for (let t = 0; t < turns.length; t++) {
+      const { action } = resolveAction(turns, t, 'ally', i);
+      if (action.skillPresetId && action.kind !== 'skip') return true;
+    }
+  }
+  return false;
+}
+
+function makeInitialRuntime(state, maxHp, allyCount, enemyBaseSpeed) {
+  return {
+    maxHp, allyCount, seq: 0,
+    allies: Array.from({ length: allyCount }, (_, i) => ({
+      baseAttack: parseNumber(state.allies?.[i]?.attack, `キャラ${i + 1}の攻撃力`, { min: 0 }),
+      baseSpeed: parseNumber(state.allies?.[i]?.speed, `キャラ${i + 1}の素早さ`, { min: 0 }),
+      star: state.allies?.[i]?.star ?? '', attribute: state.allies?.[i]?.attribute ?? '',
+      attackMods: [], speedMods: [], weaknessMods: [], actionsTaken: 0
+    })),
+    enemy: { baseSpeed: enemyBaseSpeed, speedMods: [], attackMods: [], defenseMods: [], poison: 'none', race: state.enemy?.race === 'undead' ? 'undead' : 'normal' },
+    pendingReelBoosts: []
+  };
+}
+
+function simulateKillProbabilityWithActivation(state) {
+  const maxHp = parseIntValue(state.enemy?.maxHp, '敵HP', { min: 1, max: 9999999 });
+  const enemyBaseSpeed = parseNumber(state.enemy?.speed, '敵の素早さ', { min: 0 });
+  const allyCount = parseIntValue(state.allyCount, '味方人数', { min: 1, max: 3 });
+  const turns = Array.isArray(state.turns) && state.turns.length ? state.turns : [];
+  if (!turns.length) throw new Error('ターンを1つ以上設定してください');
+
+  let scenarios = [{ runtime: makeInitialRuntime(state, maxHp, allyCount, enemyBaseSpeed), reels: Array(allyCount).fill(0), hpDist: new Map([[maxHp, 1]]) }];
+  const timeline = [];
+  const missing = new Set();
+  let firstFinalOrder = [];
+
+  for (let turnIndex = 0; turnIndex < turns.length; turnIndex++) {
+    const turn = turns[turnIndex] ?? {};
+    const isFinalTurn = turnIndex === turns.length - 1;
+    const finished = [];
+
+    for (const baseScenario of scenarios) {
+      const order = actorOrder(baseScenario.runtime);
+      if (!firstFinalOrder.length && isFinalTurn) firstFinalOrder = order;
+      const lastAllyPosition = Math.max(...order.map((actor, pos) => actor.side === 'ally' ? pos : -1));
+      let active = [{ ...baseScenario, order }];
+
+      for (let pos = 0; pos < order.length; pos++) {
+        const actor = order[pos];
+        const next = [];
+        for (const sc of active) {
+          const runtime = sc.runtime;
+          if (actor.side === 'ally') {
+            expireSourceLinkedMods(runtime, actor.index, 'start');
+            const { action } = resolveAction(turns, turnIndex, 'ally', actor.index);
+            const characterId = state.allies?.[actor.index]?.characterId ?? '';
+            const transitions = activationTransitionsFor({ characterId, skillPresetId: action.skillPresetId, skillName: action.skillName, startReel: sc.reels[actor.index] ?? 0, commandVariant: state.allies?.[actor.index]?.commandVariant ?? '' });
+            if (!transitions && characterId && action.skillPresetId) missing.add(`${characterId}:${action.skillName}`);
+            const branches = transitions ?? [{ nextReel: sc.reels[actor.index] ?? 0, activated: true, probability: 1 }];
+
+            for (const tr of branches) {
+              if (tr.probability <= 0) continue;
+              const rt = cloneRuntimeState(runtime);
+              const reels = sc.reels.slice();
+              reels[actor.index] = tr.nextReel;
+              let hp = scaleDistribution(sc.hpDist, tr.probability);
+              if (tr.activated) hp = applyActivatedAllyAction(rt, hp, action, actor.index, state);
+              rt.allies[actor.index].actionsTaken += 1;
+              expireSourceLinkedMods(rt, actor.index, 'end');
+              applyPendingReelBoosts(rt, reels);
+              next.push({ runtime: rt, reels, hpDist: hp, order });
+            }
+          } else {
+            const rt = cloneRuntimeState(runtime);
+            let hp = new Map(sc.hpDist);
+            const rawEnemyAction = turn.enemyAction ?? { enabled: false, effect: { type: 'none' } };
+            let effect = rawEnemyAction.effect ?? { type: 'none' };
+            if (effect.type === 'same') {
+              for (let i = turnIndex - 1; i >= 0; i--) {
+                const prev = turns[i]?.enemyAction?.effect;
+                if (prev && prev.type !== 'same') { effect = prev; break; }
+              }
+              if (effect.type === 'same') effect = { type: 'none' };
+            }
+            if (rawEnemyAction.enabled !== false) hp = enemyEffect(rt, effect, hp);
+            hp = applyPoison(rt, hp);
+            next.push({ runtime: rt, reels: sc.reels.slice(), hpDist: hp, order });
+          }
+        }
+        active = mergeScenarios(next);
+        if (isFinalTurn && pos === lastAllyPosition) {
+          finished.push(...active);
+          active = [];
+          break;
+        }
+      }
+      if (active.length) {
+        for (const sc of active) decrementTimedEffects(sc.runtime);
+        finished.push(...active);
+      }
+    }
+    scenarios = mergeScenarios(finished);
+    const combined = combinedHpDistribution(scenarios);
+    const range = hpRange(combined);
+    timeline.push({ turn: turnIndex + 1, label: `T${turnIndex + 1}終了`, kind: 'turn', killChance: killChance(combined), minLiveHp: range.min, maxLiveHp: range.max });
+    if (isFinalTurn) break;
+  }
+
+  const hpDistribution = combinedHpDistribution(scenarios);
+  return { killChance: killChance(hpDistribution), hpDistribution, timeline, finalTurn: turns.length, finalOrder: firstFinalOrder, missingCommandProfiles: [...missing] };
+}
+
+export function simulateKillProbability(state) {
+  return hasAnyActivationModel(state) ? simulateKillProbabilityWithActivation(state) : simulateKillProbabilityLegacy(state);
 }

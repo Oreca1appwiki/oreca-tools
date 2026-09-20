@@ -215,7 +215,16 @@ export const SKILL_PRESETS = Object.freeze([
   major(attack('meteor', 'メテオ！', { multiplier: '160', attribute: 'all', attackType: 'magic' }), 'other'),
   major(attack('purifying_flame', '浄化の炎', { multiplier: '50', undeadSkillMultiplier: '170', attribute: 'fire', attribute2: 'holy', attackType: 'magic' }), 'other'),
   major(attack('shiden', '紫電', { multiplier: '200', attribute: 'thunder', attackType: 'physical' }), 'other'),
-  major(attack('critical_hit', '会心の一撃', { multiplier: '200', attribute: 'none', attackType: 'physical' }), 'other')
+  major(attack('critical_hit', '会心の一撃', { multiplier: '200', attribute: 'none', attackType: 'physical' }), 'other'),
+
+  major({
+    id: 'princess_cheer', name: '王女のせいえん', kind: 'effect', skillName: '王女のせいえん',
+    effects: [], note: '対象のコマンドリールを2つ上げます。', targetRequired: true, reelBoost: 2
+  }, 'other'),
+  major({
+    id: 'queen_reward', name: '女王のごほうび', kind: 'effect', skillName: '女王のごほうび',
+    effects: [], note: '対象のコマンドリールを3つ上げます。', targetRequired: true, reelBoost: 3
+  }, 'other'),
 ]);
 
 export const SKILL_PRESET_BY_ID = new Map(SKILL_PRESETS.map(p => [p.id, p]));

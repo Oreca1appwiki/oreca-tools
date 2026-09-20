@@ -70,7 +70,7 @@ const CHARACTER_PRESETS = Object.freeze([
   { id: 'ares', name: '熱剣士アレス', group: 'condition', skill: 'こうげき！', attack: '73', speed: '21', star: '3', attribute: 'fire', kind: 'attack' },
   { id: 'chibimuus', name: 'チビムウス', group: 'condition', skill: 'こうげき！', attack: '45', speed: '15', star: '2', attribute: 'fire', kind: 'attack' },
   { id: 'lafroig', name: '魔皇ラフロイグ', group: 'condition', skill: 'こうげき！', attack: '94', speed: '57', star: '4', attribute: 'fire', kind: 'attack' },
-  { id: 'mermaid_mellow', name: 'マーメイドメロウ', group: 'condition', skill: 'こうげき！', attack: '68', speed: '73', star: '3', attribute: 'water', kind: 'attack' },
+  { id: 'mermaid_mellow', name: 'マーメイドメロウ', group: 'condition', skill: 'シャボン・グラン', attack: '68', speed: '73', star: '3', attribute: 'water', kind: 'attack' },
   { id: 'captain_azul', name: 'キャプテン・アズール', group: 'condition', skill: 'シビレ斬り', attack: '63', speed: '42', star: '3', attribute: 'water', kind: 'attack' },
   { id: 'elysion', name: '光王エーリュシオン', group: 'condition', skill: '行動スキップ', attack: '78', speed: '52', star: '4', attribute: 'earth', kind: 'skip', secondSkill: '浄化の炎', secondKind: 'attack' },
   { id: 'hien', name: '剣豪ヒエン', group: 'condition', skill: '紫電', attack: '63', speed: '78', star: '3', attribute: 'wind', kind: 'attack' },
@@ -221,7 +221,7 @@ function normalizeState(saved, legacyAmounts = false, attackBuffAmountNotation =
   state.enemy = { ...fallback.enemy, ...(saved.enemy ?? {}) };
   state.characterStats = { ...defaultCharacterStats(), ...(saved.characterStats ?? {}) };
   state.allyCount = Math.min(3, Math.max(1, Number(saved.allyCount) || fallback.allyCount));
-  state.allies = fallback.allies.map((ally, i) => ({ ...ally, ...(saved.allies?.[i] ?? {}), characterId: saved.allies?.[i]?.characterId ?? ally.characterId ?? '' }));
+  state.allies = fallback.allies.map((ally, i) => ({ ...ally, ...(saved.allies?.[i] ?? {}), characterId: saved.allies?.[i]?.characterId ?? ally.characterId ?? '', commandVariant: saved.allies?.[i]?.commandVariant ?? ally.commandVariant ?? '' }));
   state.allies.forEach(ally => {
     if (!ally.characterId) {
       ally.star ??= '';
@@ -233,6 +233,11 @@ function normalizeState(saved, legacyAmounts = false, attackBuffAmountNotation =
     ally.speed = status.speed || '0';
     ally.star = status.star || '';
     ally.attribute = status.attribute || '';
+    if (ally.characterId === 'mimitoshishi') {
+      if (!['mixed', 'attack6'].includes(ally.commandVariant)) ally.commandVariant = 'mixed';
+    } else {
+      ally.commandVariant = '';
+    }
   });
   state.turns = Array.isArray(saved.turns) && saved.turns.length ? saved.turns.slice(0, 12) : fallback.turns;
 
@@ -388,6 +393,7 @@ function applySkillPresetToAction(action, presetId) {
   action.kind = skill.kind;
   action.skillName = skill.skillName;
   action.effects = deepClone(skill.effects ?? []);
+  if (skill.targetRequired && !/^ally[1-3]$/.test(action.presetTarget ?? '')) action.presetTarget = `ally1`;
   action.presetNote = skill.note ?? '';
   resetAttackPresetFields(action);
 
@@ -428,6 +434,11 @@ function applyCharacterPreset(allyIndex, characterId) {
   ally.speed = status.speed || '0';
   ally.star = status.star || '';
   ally.attribute = status.attribute || '';
+  if (characterId === 'mimitoshishi') {
+    if (!['mixed', 'attack6'].includes(ally.commandVariant)) ally.commandVariant = 'mixed';
+  } else {
+    ally.commandVariant = '';
+  }
 
   state.turns.forEach((turn, turnIndex) => {
     const action = turn.allyActions[allyIndex];
@@ -638,7 +649,7 @@ function actionCardHtml(action, turnIndex, allyIndex) {
       </div>
       ${action.kind !== 'same' ? `
         <label class="mini-field"><span>主要技プリセット</span><select class="skill-preset">${skillPresetOptionsHtml(action.skillPresetId ?? '')}</select></label>
-        ${presetMeta?.note ? `<p class="inline-note">${escapeHtml(presetMeta.note)}</p>` : ''}${presetSelected ? `<p class="inline-note">プリセット効果を自動適用します。効果内容は編集できません。</p>` : ''}` : ''}
+        ${presetMeta?.note ? `<p class="inline-note">${escapeHtml(presetMeta.note)}</p>` : ''}${presetMeta?.targetRequired ? `<label class="mini-field"><span>対象</span>${targetSelectHtml(action.presetTarget ?? `ally${allyIndex + 1}`, allyIndex, 'preset-target-select')}</label>` : ''}${presetSelected ? `<p class="inline-note">プリセット効果を自動適用します。効果内容は編集できません。</p>` : ''}` : ''}
       ${!presetSelected && action.kind === 'attack' ? `
         ${action.damageFormula === 'windmill' ? `<p class="inline-note"><strong>風車式:</strong> 1発=ATK×0.6+SPD×0.15 / ヒット数=max(1, floor(SPD÷20))、最大10回。現在のバフ後ステータスで計算します。</p>` : ''}
         <div class="action-input-grid">
@@ -739,6 +750,11 @@ function resultHtml(result, error = '') {
   const pctText = pct > 0 && pct < 0.01 ? '<0.01%' : `${pct.toFixed(2)}%`;
   const verdict = pct >= 100 - 1e-10 ? '確定撃破' : pct <= 1e-12 ? '撃破不可' : '確率撃破';
   const finalOrder = result.finalOrder.map(a => a.side === 'enemy' ? `敵(${a.speed})` : `キャラ${a.index + 1}(${a.speed})`).join(' → ');
+  const missingProfiles = [...new Set((result.missingCommandProfiles ?? []).map(x => {
+    const [id, skill] = String(x).split(':');
+    return `${CHARACTER_BY_ID.get(id)?.name ?? id}（${skill ?? ''}）`;
+  }))];
+  const missingHtml = missingProfiles.length ? `<div class="result-meta error-text">コマンド内訳未登録のため発動率未反映: ${escapeHtml(missingProfiles.join('、'))}</div>` : '';
   return `
     <section class="result-panel kill-result" id="killResultPanel">
       <div class="result-card kill-result-main">
@@ -750,6 +766,7 @@ function resultHtml(result, error = '') {
         <strong class="kill-verdict">${verdict}</strong>
       </div>
       <div class="result-meta">最終ターン行動順: ${escapeHtml(finalOrder)}</div>
+      ${missingHtml}
     </section>`;
 }
 
@@ -801,6 +818,11 @@ function render() {
           <div class="ally-card" data-ally-index="${i}">
             <strong>キャラ${i + 1}</strong>
             <label class="mini-field"><span>モンスター</span><select class="ally-character">${characterOptionsHtml(state.allies[i].characterId ?? '')}</select></label>
+            ${state.allies[i].characterId === 'mimitoshishi' ? `
+              <label class="mini-field"><span>コマンド型</span><select class="ally-command-variant">
+                <option value="attack6" ${state.allies[i].commandVariant === 'attack6' ? 'selected' : ''}>こうげき！×6</option>
+                <option value="mixed" ${state.allies[i].commandVariant !== 'attack6' ? 'selected' : ''}>こうげき！×2＋プチ・アイスストーム×4</option>
+              </select></label>` : ''}
             ${state.allies[i].characterId ? `
               <div class="preset-status-summary">
                 <span>攻撃 ${escapeHtml(state.allies[i].attack)}</span>
@@ -848,6 +870,7 @@ function collectStateFromDom() {
     state.allies[i].speed = card.querySelector('.ally-speed')?.value ?? state.allies[i].speed;
     state.allies[i].star = card.querySelector('.ally-star')?.value ?? state.allies[i].star ?? '';
     state.allies[i].attribute = card.querySelector('.ally-attribute')?.value ?? state.allies[i].attribute ?? '';
+    state.allies[i].commandVariant = card.querySelector('.ally-command-variant')?.value ?? state.allies[i].commandVariant ?? '';
     if (!state.allies[i].characterId) rememberCharacterStats(state.allies[i]);
   });
 
@@ -876,6 +899,8 @@ function collectStateFromDom() {
       const action = state.turns[turnIndex].allyActions[allyIndex];
       const selectedPresetId = card.querySelector('.skill-preset')?.value ?? action.skillPresetId ?? '';
       action.skillPresetId = selectedPresetId;
+      const presetTargetCode = card.querySelector('.preset-target-select')?.value;
+      if (presetTargetCode) action.presetTarget = targetFromCode(presetTargetCode)[0] ?? action.presetTarget;
       if (!selectedPresetId) {
         action.kind = card.querySelector('.action-kind')?.value ?? action.kind;
         action.skillMultiplier = card.querySelector('.skill-multiplier')?.value ?? action.skillMultiplier;
@@ -966,6 +991,8 @@ root.addEventListener('change', event => {
     const card = event.target.closest('.ally-card');
     const allyIndex = Number(card?.dataset.allyIndex);
     if (Number.isInteger(allyIndex)) applyCharacterPreset(allyIndex, event.target.value);
+  } else if (event.target.classList.contains('ally-command-variant')) {
+    collectStateFromDom();
   } else if (event.target.classList.contains('effect-type')) {
     collectStateFromDom();
     const row = event.target.closest('.effect-row');
@@ -1012,6 +1039,7 @@ root.addEventListener('change', event => {
     event.target.classList.contains('enemy-enabled') ||
     event.target.classList.contains('enemy-effect-type') ||
     event.target.classList.contains('ally-character') ||
+    event.target.classList.contains('ally-command-variant') ||
     event.target.classList.contains('effect-type') ||
     event.target.classList.contains('effect-mode') ||
     event.target.classList.contains('main-buff-mode')

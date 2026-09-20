@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { attackDamageDistribution, cloneDefaultState, simulateKillProbability } from '../kill/engine.js';
 import { SKILL_PRESETS, SKILL_PRESET_BY_ID } from '../kill/presets.js';
+import { normalActivationTransitions, transformActivationTransitions } from '../kill/commands.js';
 
 function approx(actual, expected, eps = 1e-10) {
   assert.ok(Math.abs(actual - expected) <= eps, `expected ${expected}, got ${actual}`);
@@ -74,9 +75,9 @@ console.log('kill-engine tests: OK');
   assert.equal(s.enemy.attribute, 'fire');
   assert.equal(s.enemy.speed, '45');
   assert.deepEqual(s.allies, [
-    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind' },
-    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire' },
-    { characterId: '', attack: '0', speed: '0', star: '', attribute: '' }
+    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind', commandVariant: '' },
+    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire', commandVariant: '' },
+    { characterId: '', attack: '0', speed: '0', star: '', attribute: '', commandVariant: '' }
   ]);
   assert.equal(s.turns[0].allyActions[0].skillName, 'ロキブランド');
   assert.equal(s.turns[0].allyActions[0].buff.value, '150');
@@ -431,7 +432,7 @@ console.log('kill-engine tests: OK');
     'epidemic_glass',
     'foot_sweep', 'shibire_giri', 'attack_bang', 'dragon_tail',
     'aqua_breath', 'shining_breath', 'fire1', 'ice1', 'thunder1', 'meteor',
-    'purifying_flame', 'shiden', 'critical_hit'
+    'purifying_flame', 'shiden', 'critical_hit', 'princess_cheer', 'queen_reward'
   ]);
 }
 
@@ -598,4 +599,156 @@ console.log('kill-engine tests: OK');
   };
   approx(make('fire').killChance, 1);
   approx(make('water').killChance, 0);
+}
+
+// 24) ケロゴン(緑)は「竜のしっぽ」6個で確定発動する。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.allies[0] = { characterId: 'kerogon_green', attack: '100', speed: '100', star: '1', attribute: 'wind' };
+  s.enemy.maxHp = '80';
+  s.enemy.speed = '1';
+  const p = SKILL_PRESET_BY_ID.get('dragon_tail');
+  s.turns[0].allyActions[0] = { ...p, skillPresetId: 'dragon_tail' };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 1, 1e-12);
+}
+
+// 25) 赤のエンプレス「女王のごほうび」は対象を3リール上げ、発動率も含める。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 2;
+  s.allies[0] = { characterId: 'red_empress', attack: '63', speed: '100', star: '4', attribute: 'water' };
+  s.allies[1] = { characterId: 'clear_blue_dragon', attack: '100', speed: '90', star: '4', attribute: 'water' };
+  s.enemy.maxHp = '1';
+  s.enemy.speed = '1';
+  s.turns[0].allyActions[0] = { ...SKILL_PRESET_BY_ID.get('queen_reward'), skillPresetId: 'queen_reward', presetTarget: 'ally2' };
+  s.turns[0].allyActions[1] = { ...SKILL_PRESET_BY_ID.get('aqua_breath'), skillPresetId: 'aqua_breath' };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  // 1リール目: ごほうび3/6。成功時は対象が4リールへ上がるが、
+  // 新しい4リール目はクリアアクアブレス×6なのでアクアブレスは0%。
+  // ごほうび不発3/6のときだけ、1リール目のアクアブレス1/6を引ける。
+  approx(r.killChance, 1 / 12, 1e-12);
+}
+
+
+// 26) Google Drive画像から読み取ったコマンド型を発動率へ反映する。
+{
+  const activationRate = (characterId, skillName, startReel = 0) =>
+    normalActivationTransitions(characterId, skillName, startReel)
+      .filter(x => x.activated)
+      .reduce((a, x) => a + x.probability, 0);
+
+  approx(activationRate('sylph', 'こうげき！'), 1);
+  approx(activationRate('crow', 'こうげき！'), 1);
+  approx(activationRate('mermaid_mellow', 'シャボン・グラン'), 5 / 6);
+  approx(activationRate('soccerra', 'こうげき！'), 1 / 6);
+  approx(activationRate('kerogon_gold', '竜のしっぽ'), 4 / 6);
+  approx(activationRate('ifrit', 'ファイア!!'), 5 / 6);
+  approx(activationRate('damkina', 'ウィンド!!'), 5 / 6);
+  approx(activationRate('dartan', '連撃'), 1);
+  approx(activationRate('marduk', '会心の一撃'), 25 / 36);
+  approx(activationRate('heavy_behemoth', 'おしつぶし'), 31 / 36);
+  approx(activationRate('gate_dante', 'こうげき！', 0), 1 / 6);
+  approx(activationRate('gate_dante', 'こうげき！', 3), 0);
+  approx(activationRate('yamato', 'こうげき！', 0), 5 / 6);
+  approx(activationRate('yamato', 'こうげき！', 3), 2 / 6);
+  approx(activationRate('susanoo', 'こうげき！', 0), 5 / 6);
+  approx(activationRate('susanoo', 'こうげき！', 3), 1 / 6);
+  approx(activationRate('ginger_ale', 'こうげき！', 0), 4 / 6);
+  approx(activationRate('ginger_ale', 'こうげき！', 3), 0);
+  approx(activationRate('fire_drake', 'こうげき！', 0), 3 / 6);
+  approx(activationRate('fire_drake', 'こうげき！', 1), 4 / 6);
+  approx(activationRate('fire_drake', 'こうげき！', 2), 0);
+
+  // 邪神サッカーラは1リール目から必ず2リール目へ移動し、
+  // 2リール目でこうげき！を外すと★★→★★★★で4リール目へ直接移る。
+  const soccerra = normalActivationTransitions('soccerra', 'こうげき！', 0);
+  approx(soccerra.find(x => x.activated)?.probability ?? 0, 1 / 6);
+  approx(soccerra.find(x => !x.activated && x.nextReel === 3)?.probability ?? 0, 5 / 6);
+}
+
+// 27) キャミネコは敵属性で選ばれた技ごとに別の所持個体画像を使う。
+{
+  const rate = skillName => normalActivationTransitions('camineko', skillName, 0)
+    .filter(x => x.activated).reduce((a, x) => a + x.probability, 0);
+  approx(rate('ファイア！'), 1);
+  approx(rate('アイス！'), 1);
+  approx(rate('サンダー！'), 1);
+}
+
+// 28) ソンゴクウ／牛魔王は変化モード側の固定リールを通す。
+{
+  const monkey = transformActivationTransitions('猿', 'loki_brand', 'ロキブランド', 0)
+    .filter(x => x.activated).reduce((a, x) => a + x.probability, 0);
+  const ox = transformActivationTransitions('牛', 'oni_spirit', '鬼の気合入れ', 0)
+    .filter(x => x.activated).reduce((a, x) => a + x.probability, 0);
+  approx(monkey, 1);
+  approx(ox, 1);
+}
+
+
+// 29) v0.5.9 コマンド修正とミミトシシ2型。
+{
+  const rate = (characterId, skillName, reel = 0, variant = '') =>
+    normalActivationTransitions(characterId, skillName, reel, variant)
+      .filter(x => x.activated).reduce((a, x) => a + x.probability, 0);
+
+  approx(rate('kerogon_green', '竜のしっぽ'), 1);
+  approx(rate('oniwaka', '足ばらい', 0), 1);
+  approx(rate('oniwaka', '足ばらい', 1), 1);
+  approx(rate('bahamut', 'シャイニングブレス', 0), 1);
+  approx(rate('bahamut', 'シャイニングブレス', 3), 1);
+  approx(rate('raijin_kukulkan', 'つつきまくり', 0), 1);
+  approx(rate('raijin_kukulkan', 'つつきまくり', 3), 1);
+
+  approx(rate('clear_blue_dragon', 'アクアブレス', 0), 1 / 6);
+  approx(rate('clear_blue_dragon', 'アクアブレス', 1), 3 / 6);
+  approx(rate('clear_blue_dragon', 'アクアブレス', 2), 1 / 6);
+  approx(rate('clear_blue_dragon', 'アクアブレス', 3), 0);
+
+  approx(rate('dark_bahamut', 'レッドファイアブレス', 0), 5 / 6);
+  approx(rate('dark_bahamut', 'レッドファイアブレス', 1), 1);
+  approx(rate('dark_bahamut', 'ブルーアクアブレス', 0), 5 / 6);
+  approx(rate('dark_bahamut', 'イエローアースブレス', 2), 1);
+  approx(rate('dark_bahamut', 'グリーンエアブレス', 3), 1);
+
+  approx(rate('mimitoshishi', 'こうげき！', 0, 'attack6'), 1);
+  approx(rate('mimitoshishi', 'こうげき！', 0, 'mixed'), 2 / 6);
+
+  // エーリュシオンはためるだけで1→2→3→4リールへ進み、4リールで浄化の炎100%。
+  const e1 = normalActivationTransitions('elysion', '浄化の炎', 0);
+  approx(e1.find(x => !x.activated && x.nextReel === 1)?.probability ?? 0, 1);
+  const e2 = normalActivationTransitions('elysion', '浄化の炎', 1);
+  approx(e2.find(x => !x.activated && x.nextReel === 2)?.probability ?? 0, 1);
+  const e3 = normalActivationTransitions('elysion', '浄化の炎', 2);
+  approx(e3.find(x => !x.activated && x.nextReel === 3)?.probability ?? 0, 1);
+  approx(rate('elysion', '浄化の炎', 3), 1);
+
+  // 最後に追加した4体。
+  approx(rate('platinum_drake', '竜のしっぽ', 0), 5 / 6);
+  approx(rate('platinum_drake', '竜のしっぽ', 3), 1 / 6);
+  approx(rate('shinjuryu_kukulkan', 'つつきまくり', 0), 1);
+  approx(rate('astaroth', 'メテオ！', 0), 1);
+  approx(rate('toritamago', 'こうげき！', 0), 0);
+}
+
+
+// 30) ミミトシシのコマンド型選択が撃破確率本体へ渡る。
+{
+  const make = variant => {
+    const s = cloneDefaultState();
+    s.allyCount = 1;
+    s.allies[0] = { characterId: 'mimitoshishi', attack: '100', speed: '100', star: '1', attribute: 'water', commandVariant: variant };
+    s.enemy.maxHp = '50';
+    s.enemy.speed = '1';
+    const p = SKILL_PRESET_BY_ID.get('attack_bang');
+    s.turns[0].allyActions[0] = { ...p, skillPresetId: 'attack_bang' };
+    s.turns[0].enemyAction.enabled = false;
+    return simulateKillProbability(s).killChance;
+  };
+  approx(make('attack6'), 1);
+  approx(make('mixed'), 2 / 6);
 }

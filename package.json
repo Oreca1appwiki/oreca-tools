@@ -1,6 +1,6 @@
 {
   "name": "oreca-tools",
-  "version": "0.5.4",
+  "version": "0.5.9",
   "private": true,
   "type": "module",
   "scripts": {
