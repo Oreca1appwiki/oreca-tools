@@ -7,14 +7,14 @@ const attack = (id, name, {
   multiplier = '100', attribute = 'none', attribute2 = 'none', attackType = 'physical', hits = '1',
   multiplierMin = '', multiplierMax = '', multiplierStep = '', hitsMin = '', hitsMax = '',
   undeadSkillMultiplier = '', poisonedSkillMultiplier = '', deadlyPoisonSkillMultiplier = '',
-  weakDefenderAttribute = '', weakSkillMultiplier = '', damageFormula = '',
-  effects = [], note = '', selectable = true
+  weakDefenderAttribute = '', weakSkillMultiplier = '', raceSkillMultipliers = {}, damageFormula = '',
+  effects = [], note = '', selectable = true, selfDestruct = false, enemyTarget = 'single'
 } = {}) => ({
   id, name, kind: 'attack', skillName: name, skillMultiplier: multiplier,
   attackAttribute: attribute, attackAttribute2: attribute2, attackType, hits,
   skillMultiplierMin: multiplierMin, skillMultiplierMax: multiplierMax, skillMultiplierStep: multiplierStep,
   hitsMin, hitsMax, undeadSkillMultiplier, poisonedSkillMultiplier, deadlyPoisonSkillMultiplier,
-  weakDefenderAttribute, weakSkillMultiplier, damageFormula, effects, note, selectable
+  weakDefenderAttribute, weakSkillMultiplier, raceSkillMultipliers, damageFormula, effects, note, selectable, selfDestruct, enemyTarget
 });
 
 const buff = (id, name, buffData, effects = [], note = '', selectable = true) => ({
@@ -51,13 +51,21 @@ export const SKILL_PRESETS = Object.freeze([
   major(buff('sun_hymn', '太陽讃歌',
     { type: 'atkBuff', target: 'fireAllies', mode: 'add', value: '50', duration: '3' },
     [], '味方の火属性モンスターを自動で対象にします。'), 'buff'),
+  major(effectOnly('sun_blessing', '太陽の加護', [
+    { type: 'statusCure', target: 'all' },
+    { type: 'statusAvoid', target: 'all', value: '45', duration: '3' }
+  ], '味方全体の状態異常を治療し、3ターンの間、状態異常付与率を45ポイント低下。無分類技由来の状態異常には軽減が効かないものとして扱います。'), 'buff'),
+  major(effectOnly('kerakuzu', 'ケラクズ', [
+    { type: 'statusCure', target: 'all' },
+    { type: 'statusImmune', target: 'all', duration: '2' }
+  ], '味方全体の状態異常を治療し、2ターンの間、状態異常を無効化します。'), 'buff'),
   major(buff('item_parts', 'アイテムパーツ',
     { type: 'atkBuff', target: 'self', mode: 'add', value: '25', duration: '3' },
     [{ type: 'speedBuff', target: 'self', mode: 'add', value: '60', duration: '3' }],
     '撃破確率計算では自身への攻撃+25・素早さ+60（3ターン）を反映します。最大HP+80、99加護、被ダメ30%カットは未反映です。'), 'buff'),
   major(buff('sword_dance', 'つるぎの舞',
     { type: 'atkBuff', target: 'others', mode: 'mult', value: '120', duration: '3' },
-    [], '自身以外の味方を1.2倍。自動連続使用・被弾による解除はこのツールでは扱いません。'), 'buff'),
+    [], '自身以外の味方を初回1.20倍。以後は自動継続し、1.25→1.30→1.35倍を重ね掛けします。被弾解除は敵の攻撃ダメージを扱わない現行モデルでは発生しません。'), 'buff'),
   major(buff('name_announcement', '名乗り上げ',
     { type: 'atkBuff', target: 'self', mode: 'mult', value: '200', duration: '3' },
     [], '味方をかばう効果は撃破確率には反映しません。'), 'buff'),
@@ -84,7 +92,8 @@ export const SKILL_PRESETS = Object.freeze([
 
   major(attack('crush', 'おしつぶし', {
     multiplier: '65', attribute: 'earth', attackType: 'physical', hits: '4',
-    note: '麻痺15%は撃破確率計算では未反映。'
+    effects: [{ type: 'enemyParalysis', chance: '15' }],
+    note: '15%で麻痺。次の敵行動を1回失って解除する確率枝を反映します。'
   }), 'attack'),
   major(attack('peck_many', 'つつきまくり', {
     multiplier: '70', attribute: 'wind', attackType: 'physical', hits: '3'
@@ -105,29 +114,35 @@ export const SKILL_PRESETS = Object.freeze([
   major(attack('water_torture', '水責め', { multiplier: '165', attribute: 'water', attackType: 'magic' }), 'attack'),
   major(attack('wet_slicer', 'ウェットスライサー', { multiplier: '50', attribute: 'water', attackType: 'physical', hits: '4' }), 'attack'),
   major(attack('red_fire_breath', 'レッドファイアブレス', {
-    multiplier: '90', attribute: 'fire', attackType: 'other', weakDefenderAttribute: 'water', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'fire', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'water', weakSkillMultiplier: '150',
     note: '通常90%。水属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('blue_aqua_breath', 'ブルーアクアブレス', {
-    multiplier: '90', attribute: 'water', attackType: 'other', weakDefenderAttribute: 'earth', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'water', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'earth', weakSkillMultiplier: '150',
     note: '通常90%。土属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('yellow_earth_breath', 'イエローアースブレス', {
-    multiplier: '90', attribute: 'earth', attackType: 'other', weakDefenderAttribute: 'wind', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'earth', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'wind', weakSkillMultiplier: '150',
     note: '通常90%。風属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('green_air_breath', 'グリーンエアブレス', {
-    multiplier: '90', attribute: 'wind', attackType: 'other', weakDefenderAttribute: 'fire', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'wind', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'fire', weakSkillMultiplier: '150',
     note: '通常90%。火属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('roaring_lightning', '轟く稲妻', {
     multiplier: '80', attribute: 'thunder', attackType: 'physical', hits: '4', hitsMin: '3', hitsMax: '5',
-    note: '麻痺付与確率は撃破確率計算では未反映。'
+    effects: [{ type: 'enemyParalysis', chance: '45' }],
+    note: '45%で麻痺。ヒット数によらず攻撃行動単位で1回判定します。'
   }), 'attack'),
-  major(attack('rock_throw', '岩飛ばし', { multiplier: '180', attribute: 'earth', attackType: 'physical' }), 'attack'),
+  major(attack('rock_throw', '岩飛ばし', {
+    multiplier: '180', attribute: 'earth', attackType: 'physical',
+    raceSkillMultipliers: { angel: '90', birdBeast: '90' },
+    note: '通常180%。天使・鳥獣には90%。'
+  }), 'attack'),
   major(attack('poison_crush', 'どくつぶし', {
     multiplier: '80', poisonedSkillMultiplier: '105', attribute: 'poison', attackType: 'physical', hits: '3',
-    note: '敵が毒・猛毒なら1発105%。毒20%付与は確率状態異常のため未反映。'
+    effects: [{ type: 'poison', chance: '20' }],
+    note: '敵が毒・猛毒なら1発105%。攻撃後20%で毒を付与します。'
   }), 'attack'),
   major(attack('kamaitachi', 'カマイタチ', {
     multiplier: '50', attribute: 'wind', attackType: 'magic', hits: '4', hitsMin: '3', hitsMax: '6'
@@ -144,7 +159,8 @@ export const SKILL_PRESETS = Object.freeze([
   }), 'attack'),
   major(attack('paralysis_arrow', 'マヒ矢', {
     multiplier: '140', attribute: 'none', attackType: 'physical',
-    note: '麻痺25%は撃破確率計算では未反映。'
+    effects: [{ type: 'enemyParalysis', chance: '25' }],
+    note: '25%で麻痺。次の敵行動を1回失って解除します。'
   }), 'attack'),
   major(attack('neck_cut_reward', 'くびかりのほうしゅう', {
     multiplier: '170', attribute: 'dark', attackType: 'physical',
@@ -152,29 +168,31 @@ export const SKILL_PRESETS = Object.freeze([
   }), 'attack'),
   major(attack('deadly_blow', '必殺の一撃', { multiplier: '250', attribute: 'none', attackType: 'physical' }), 'attack'),
   major(attack('self_destruct', '自爆', {
-    multiplier: '200', attribute: 'none', attackType: 'physical',
-    note: '使用後に使用者が離脱する処理は現在の撃破確率計算では未反映。'
+    multiplier: '200', attribute: 'none', attackType: 'physical', selfDestruct: true, enemyTarget: 'all',
+    note: '攻撃後、使用者は戦闘から離脱します。'
   }), 'attack'),
   major(attack('ikazuchi', 'イカズチ', { multiplier: '140', attribute: 'thunder', attackType: 'magic' }), 'attack'),
   major(attack('venom_salamanda', 'ヴェノム・サラマンダ', {
     multiplier: '135', attribute: 'fire', attribute2: 'poison', attackType: 'magic',
-    note: '毒40%付与は確率状態異常のため未反映。'
+    effects: [{ type: 'poison', chance: '40' }],
+    note: '攻撃後40%で毒を付与します。'
   }), 'attack'),
-  major(attack('fire_ice_breath2', '炎と氷のいき!!', { multiplier: '300', attribute: 'all', attackType: 'other' }), 'attack'),
+  major(attack('fire_ice_breath2', '炎と氷のいき!!', { multiplier: '300', attribute: 'all', attackType: 'other', enemyTarget: 'all' }), 'attack'),
   major(attack('shout', 'さけぶ', {
     multiplier: '10', attribute: 'none', attackType: 'magic',
-    note: '麻痺80%は撃破確率計算では未反映。'
+    effects: [{ type: 'enemyParalysis', chance: '80' }],
+    note: '80%で麻痺。次の敵行動を1回失って解除します。'
   }), 'attack'),
   major(attack('headwind', 'むかい風', {
     multiplier: '90', attribute: 'wind', attackType: 'magic',
     effects: [{ type: 'speedDown', mode: 'mult', value: '50', duration: '2' }],
-    note: '敵の素早さ半減（2ターン）を反映。速度差で威力が上がる部分は未反映。'
+    note: '倍率90%の全体魔法。敵の素早さ半減（2ターン、重ね掛け可）を反映。'
   }), 'attack'),
 
   major(attack('bubble_grand', 'シャボン・グラン', { multiplier: '150', attribute: 'water', attackType: 'magic' }), 'attack'),
   major(attack('rengeki', '連撃', { multiplier: '115', attribute: 'none', attackType: 'physical', hits: '2' }), 'attack'),
-  major(attack('heat_wave', 'ヒートウェイブ', { multiplier: '90', attribute: 'fire', attackType: 'physical' }), 'attack'),
-  major(attack('ice_storm_strike', '氷嵐撃', { multiplier: '140', attribute: 'ice', attribute2: 'wind', attackType: 'physical' }), 'attack'),
+  major(attack('heat_wave', 'ヒートウェイブ', { multiplier: '90', attribute: 'fire', attackType: 'physical', enemyTarget: 'all' }), 'attack'),
+  major(attack('ice_storm_strike', '氷嵐撃', { multiplier: '140', attribute: 'wind', attribute2: 'ice', attackType: 'physical' }), 'attack'),
 
   // その他：この撃破確率ツールで敵HPに直接影響しない効果は、選択肢として保持して注記する。
 
@@ -198,24 +216,75 @@ export const SKILL_PRESETS = Object.freeze([
   // ---------------------------------------------------------------------------
   major(attack('foot_sweep', '足ばらい', {
     multiplier: '40', attribute: 'none', attackType: 'physical',
-    effects: [{ type: 'defenseDown', mode: 'mult', value: '20', duration: '99', expiry: 'sourceNextActionStart' }],
-    note: '敵の被ダメージ1.2倍。使用者の次の行動開始まで。'
+    effects: [
+      { type: 'defenseDown', mode: 'mult', value: '20', duration: '99', expiry: 'sourceNextActionStart' },
+      { type: 'enemyParalysis', chance: '15' }
+    ],
+    note: '敵の被ダメージ1.2倍（使用者の次の行動開始まで）＋15%で麻痺。'
   }), 'other'),
   major(attack('shibire_giri', 'シビレ斬り', {
     multiplier: '100', attribute: 'poison', attackType: 'physical',
-    note: '麻痺30%は撃破確率計算では未反映。'
+    effects: [{ type: 'enemyParalysis', chance: '30' }],
+    note: '30%で麻痺。次の敵行動を1回失って解除します。'
   }), 'other'),
   major(attack('attack_bang', 'こうげき！', { multiplier: '100', attribute: 'none', attackType: 'physical' }), 'other'),
-  major(attack('dragon_tail', '竜のしっぽ', { multiplier: '90', attribute: 'none', attackType: 'physical' }), 'other'),
-  major(attack('aqua_breath', 'アクアブレス', { multiplier: '105', attribute: 'water', attackType: 'other' }), 'other'),
-  major(attack('shining_breath', 'シャイニングブレス', { multiplier: '105', attribute: 'light', attackType: 'other' }), 'other'),
+  major(attack('dragon_tail', '竜のしっぽ', {
+    multiplier: '90', attribute: 'none', attackType: 'physical', enemyTarget: 'all', effects: [{ type: 'poison', chance: '25' }],
+    note: '毒25%。毒は撃破確率に影響するため確率分岐で反映します。'
+  }), 'other'),
+  major(attack('aqua_breath', 'アクアブレス', { multiplier: '105', attribute: 'water', attackType: 'other', enemyTarget: 'all' }), 'other'),
+  major(attack('shining_breath', 'シャイニングブレス', { multiplier: '105', attribute: 'light', attackType: 'other', enemyTarget: 'all' }), 'other'),
   major(attack('fire1', 'ファイア！', { multiplier: '100', attribute: 'fire', attackType: 'magic' }), 'other'),
   major(attack('ice1', 'アイス！', { multiplier: '100', attribute: 'ice', attackType: 'magic' }), 'other'),
   major(attack('thunder1', 'サンダー！', { multiplier: '100', attribute: 'thunder', attackType: 'magic' }), 'other'),
   major(attack('meteor', 'メテオ！', { multiplier: '160', attribute: 'all', attackType: 'magic' }), 'other'),
   major(attack('purifying_flame', '浄化の炎', { multiplier: '50', undeadSkillMultiplier: '170', attribute: 'fire', attribute2: 'holy', attackType: 'magic' }), 'other'),
-  major(attack('shiden', '紫電', { multiplier: '200', attribute: 'thunder', attackType: 'physical' }), 'other'),
+  major(attack('shiden', '紫電', {
+    multiplier: '100', attribute: 'thunder', attackType: 'physical',
+    note: '納刀時100%、抜刀時200%。構え状態の自動追跡が未確定のため、最悪条件として100%を使用します。'
+  }), 'other'),
   major(attack('critical_hit', '会心の一撃', { multiplier: '200', attribute: 'none', attackType: 'physical' }), 'other'),
+
+
+  // ルーレット完全実行用の非表示プリセット。
+  // UIの主要技一覧には出さず、登録コマンドで実際に止まった場合だけ使用する。
+  attack('attack_plain', 'こうげき', { multiplier: '50', attribute: 'none', attackType: 'physical', selectable: false }),
+  attack('petit_ice_storm', 'プチ・アイスストーム', { multiplier: '85', attribute: 'ice', attackType: 'magic', selectable: false }),
+  attack('flutter', 'はばたき', { multiplier: '50', attribute: 'wind', attackType: 'physical', selectable: false }),
+  attack('clear_aqua_breath', 'クリアアクアブレス', { multiplier: '145', attribute: 'water', attackType: 'other', enemyTarget: 'all', selectable: false }),
+  attack('gold_breath', '金のいき', { multiplier: '120', attribute: 'all', attackType: 'other', enemyTarget: 'all', selectable: false }),
+  attack('light_breath', '光のいき', {
+    multiplier: '140', undeadSkillMultiplier: '180', raceSkillMultipliers: { demon: '180' },
+    attribute: 'light', attackType: 'other', enemyTarget: 'all', selectable: false,
+    note: '通常140%。悪魔・アンデッドには180%。'
+  }),
+  attack('hellfire_breath', '業火のいき', { multiplier: '120', attribute: 'fire', attackType: 'other', enemyTarget: 'all', selectable: false }),
+  attack('extreme_flame_breath', '極炎のいき', { multiplier: '130', attribute: 'fire', attackType: 'other', enemyTarget: 'all', selectable: false }),
+  attack('heat_saber', '熱剣ヒートセイバー', { multiplier: '200', attribute: 'heat', attackType: 'physical', selectable: false }),
+  attack('plasma_saber', '超熱剣プラズマセイバー', { multiplier: '250', attribute: 'heat', attackType: 'physical', selectable: false }),
+  attack('water_break', 'ウォーターブレイク', {
+    multiplier: '150', attribute: 'fire', attackType: 'physical',
+    weakDefenderAttribute: 'water', weakSkillMultiplier: '200', selectable: false
+  }),
+  attack('sazae_needle', 'サザエニードル', { multiplier: '200', attribute: 'water', attackType: 'physical', selectable: false }),
+  attack('holy_strike', '聖なる一撃', {
+    multiplier: '190', undeadSkillMultiplier: '360', attribute: 'holy', attackType: 'physical',
+    selectable: false, note: '通常190%。アンデッドには360%。'
+  }),
+  attack('evil_light_wave', '邪光波', { multiplier: '200', attribute: 'evil', attackType: 'magic', selectable: false }),
+  attack('rain_spear', '雨の戟', { multiplier: '200', attribute: 'water', attackType: 'physical', selectable: false }),
+  attack('doon1_hidden', 'ドウン！', { multiplier: '100', attribute: 'evil', attackType: 'magic', selectable: false }),
+  attack('salamanda_hidden', 'サラマンダ', { multiplier: '90', attribute: 'fire', attackType: 'magic', selectable: false }),
+  attack('fire_storm_hidden', 'ファイアストーム', { multiplier: '110', attribute: 'fire', attackType: 'magic', selectable: false }),
+  attack('fire0', 'ファイア', { multiplier: '50', attribute: 'fire', attackType: 'magic', selectable: false }),
+  attack('fire4', 'ファイア!!!!', { multiplier: '250', attribute: 'fire', attackType: 'magic', selectable: false }),
+  attack('aqua0', 'アクア', { multiplier: '50', attribute: 'water', attackType: 'magic', selectable: false }),
+  attack('aqua1_hidden', 'アクア!', { multiplier: '100', attribute: 'water', attackType: 'magic', selectable: false }),
+  attack('aqua4', 'アクア!!!!', { multiplier: '250', attribute: 'water', attackType: 'magic', selectable: false }),
+  attack('wind0', 'ウィンド', { multiplier: '50', attribute: 'wind', attackType: 'magic', selectable: false }),
+  attack('wind1_hidden', 'ウィンド!', { multiplier: '100', attribute: 'wind', attackType: 'magic', selectable: false }),
+  attack('wind3_hidden', 'ウィンド!!!', { multiplier: '200', attribute: 'wind', attackType: 'magic', selectable: false }),
+  attack('wind4_hidden', 'ウィンド!!!!', { multiplier: '250', attribute: 'wind', attackType: 'magic', selectable: false }),
 
   major({
     id: 'princess_cheer', name: '王女のせいえん', kind: 'effect', skillName: '王女のせいえん',

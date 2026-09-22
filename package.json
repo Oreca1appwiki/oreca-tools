@@ -1,9 +1,9 @@
 {
   "name": "oreca-tools",
-  "version": "0.5.9",
+  "version": "0.5.66",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/damage-engine.test.js && node tests/kill-engine.test.js && node tests/kill-presets.test.js && node tests/audit-kill-core.mjs && node tests/encounter-engine.test.js && node tests/skill-engine.test.js"
+    "test": "node tests/damage-engine.test.js && node tests/kill-engine.test.js && node tests/enemy-actions.test.js && node tests/companion-defense.test.js && node tests/ally-enemy-status.test.js && node tests/kill-presets.test.js && node tests/boss-presets.test.js && node tests/audit-kill-core.mjs && node tests/encounter-engine.test.js && node tests/skill-engine.test.js"
   }
 }

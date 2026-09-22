@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { attackDamageDistribution, cloneDefaultState, simulateKillProbability } from '../kill/engine.js';
+import { attackDamageDistribution, cloneDefaultState, simulateKillProbability, stealExAmount, stealExTransfer, playerExGainFromEnemyAttack } from '../kill/engine.js';
 import { SKILL_PRESETS, SKILL_PRESET_BY_ID } from '../kill/presets.js';
-import { normalActivationTransitions, transformActivationTransitions } from '../kill/commands.js';
+import { normalActivationTransitions, transformActivationTransitions, transformTargetActivationTransitions, normalCommandTransitions, transformTargetCommandTransitions, TRANSFORM_PROFILE_BY_SKILL } from '../kill/commands.js';
 
 function approx(actual, expected, eps = 1e-10) {
   assert.ok(Math.abs(actual - expected) <= eps, `expected ${expected}, got ${actual}`);
@@ -75,9 +75,9 @@ console.log('kill-engine tests: OK');
   assert.equal(s.enemy.attribute, 'fire');
   assert.equal(s.enemy.speed, '45');
   assert.deepEqual(s.allies, [
-    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind', commandVariant: '' },
-    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire', commandVariant: '' },
-    { characterId: '', attack: '0', speed: '0', star: '', attribute: '', commandVariant: '' }
+    { characterId: 'son_goku', attack: '84', speed: '78', star: '4', attribute: 'wind', race: 'normal', commandVariant: '' },
+    { characterId: 'gyumao', attack: '94', speed: '15', star: '4', attribute: 'fire', race: 'normal', commandVariant: '' },
+    { characterId: '', attack: '0', speed: '0', star: '', attribute: '', race: 'normal', commandVariant: '' }
   ]);
   assert.equal(s.turns[0].allyActions[0].skillName, 'ロキブランド');
   assert.equal(s.turns[0].allyActions[0].buff.value, '150');
@@ -627,12 +627,38 @@ console.log('kill-engine tests: OK');
   s.turns[0].allyActions[1] = { ...SKILL_PRESET_BY_ID.get('aqua_breath'), skillPresetId: 'aqua_breath' };
   s.turns[0].enemyAction.enabled = false;
   const r = simulateKillProbability(s);
-  // 1リール目: ごほうび3/6。成功時は対象が4リールへ上がるが、
-  // 新しい4リール目はクリアアクアブレス×6なのでアクアブレスは0%。
-  // ごほうび不発3/6のときだけ、1リール目のアクアブレス1/6を引ける。
-  approx(r.killChance, 1 / 12, 1e-12);
+  // v0.5.11ではルーレットで止まった全コマンドを実行する。
+  // アクアブレス以外のクリアアクアブレスもダメージになるため、HP1は全枝で撃破。
+  approx(r.killChance, 1, 1e-12);
 }
 
+
+// 25b) 赤のエンプレスのコマンド型は通常編成時だけ切り替わる。
+{
+  const rate = (variant, skillName, startReel) => normalActivationTransitions('red_empress', skillName, startReel, variant)
+    .filter(x => x.activated)
+    .reduce((a, x) => a + x.probability, 0);
+
+  // ①従来型は3・4リールとも女王のごほうび×6。
+  approx(rate('support', '女王のごほうび', 2), 1);
+  approx(rate('support', '女王のごほうび', 3), 1);
+
+  // ② 3R 会心×5＋こうげき！×1、4R 会心×6。
+  approx(rate('critical5', '会心の一撃', 2), 5 / 6);
+  approx(rate('critical5', 'こうげき！', 2), 1 / 6);
+  approx(rate('critical5', '会心の一撃', 3), 1);
+
+  // ③ 3R 会心×4＋こうげき！×2、4R 会心×6。
+  approx(rate('critical4', '会心の一撃', 2), 4 / 6);
+  approx(rate('critical4', 'こうげき！', 2), 2 / 6);
+  approx(rate('critical4', '会心の一撃', 3), 1);
+
+  // 変化先用は通常編成の commandVariant と無関係で、従来型のまま。
+  const transformReward = transformTargetActivationTransitions('queen_reward', '女王のごほうび', 2)
+    .filter(x => x.activated)
+    .reduce((a, x) => a + x.probability, 0);
+  approx(transformReward, 1);
+}
 
 // 26) Google Drive画像から読み取ったコマンド型を発動率へ反映する。
 {
@@ -750,5 +776,440 @@ console.log('kill-engine tests: OK');
     return simulateKillProbability(s).killChance;
   };
   approx(make('attack6'), 1);
-  approx(make('mixed'), 2 / 6);
+  // mixed型でプチ・アイスストームを引いた枝も実ダメージを与えるためHP50は全枝で撃破。
+  approx(make('mixed'), 1);
+}
+
+// 31) 条件モンスターは自動表示された技を100%固定で使うのではなく、
+//     登録コマンド6枠からその技を引く確率を撃破確率へ掛ける。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.allies[0] = { characterId: 'gate_dante', attack: '78', speed: '100', star: '4', attribute: 'fire', commandVariant: '' };
+  s.enemy.maxHp = '140';
+  s.enemy.attribute = 'fire';
+  s.enemy.speed = '1';
+  const p = SKILL_PRESET_BY_ID.get('attack_bang');
+  s.turns[0].allyActions[0] = { ...p, skillPresetId: 'attack_bang' };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  // 魔界の門番ダンテ1リールは「こうげき！×1 + 会心の一撃×5」。
+  // 攻撃78ではこうげき！は140HPを倒せないが、会心200%は確定で倒せる。
+  approx(r.killChance, 5 / 6, 1e-12);
+}
+
+// 32) 変化用も「七十二変化の術の停止リール」→「変化先6枠」の2段階で計算する。
+//     ファイア!!だけは1リール停止時に魔導師ジョンガリを使い、確定にする。
+{
+  const rate = xs => xs.filter(x => x.activated).reduce((a, x) => a + x.probability, 0);
+
+  approx(rate(transformTargetActivationTransitions('fire2', 'ファイア!!', 0)), 1);
+  approx(rate(transformTargetActivationTransitions('fire2', 'ファイア!!', 1)), 3 / 6);
+  approx(rate(transformTargetActivationTransitions('fire2', 'ファイア!!', 2)), 0);
+  approx(rate(transformTargetActivationTransitions('fire2', 'ファイア!!', 3)), 0);
+
+  // 1リール開始時の総合発動率。猿/牛自身の変化停止率も含む。
+  approx(rate(transformActivationTransitions('猿', 'fire2', 'ファイア!!', 0)), 1 / 2);
+  approx(rate(transformActivationTransitions('牛', 'fire2', 'ファイア!!', 0)), 3 / 8);
+}
+
+// 33) 変化用で型が確定している補助技・属性ブレスもコマンド確率を使う。
+{
+  const rate = xs => xs.filter(x => x.activated).reduce((a, x) => a + x.probability, 0);
+  // 研究者カイス: 1リールはアイテムパーツ2 + ★→★★3 + ミス1。
+  // 移動先2リールはアイテムパーツ5/6なので 2/6 + 3/6*5/6 = 3/4。
+  approx(rate(transformTargetActivationTransitions('item_parts', 'アイテムパーツ', 0)), 3 / 4);
+  // 所持個体ダークバハムート: 1リール目は各ブレス5/6、2リール以降は6/6。
+  approx(rate(transformTargetActivationTransitions('red_fire_breath', 'レッドファイアブレス', 0)), 5 / 6);
+  approx(rate(transformTargetActivationTransitions('red_fire_breath', 'レッドファイアブレス', 1)), 1);
+  // 所持個体シルフ: こうげき！×6。
+  approx(rate(transformTargetActivationTransitions('attack_bang', 'こうげき！', 0)), 1);
+}
+
+
+
+// 34) 変化用の全技プリセットにコマンド発動率プロファイルを持たせる。
+//     これにより、技名は1つに固定表示したままでも実際の6枠から発動率を掛けられる。
+{
+  const rate = xs => xs.filter(x => x.activated).reduce((a, x) => a + x.probability, 0);
+
+  // 踊り子ロレル: 1リールはミス1 + つるぎの舞5、2リール以降は確定。
+  approx(rate(transformTargetActivationTransitions('sword_dance', 'つるぎの舞', 0)), 5 / 6);
+  approx(rate(transformTargetActivationTransitions('sword_dance', 'つるぎの舞', 1)), 1);
+
+  // 風の戦士ハヤテ: 1リールは移動5/6→2リール風車4/6。
+  approx(rate(transformTargetActivationTransitions('windmill', '風車', 0)), 5 / 9);
+  approx(rate(transformTargetActivationTransitions('windmill', '風車', 1)), 4 / 6);
+
+  // 怒る蛇ムシュフシュ: 3リール以降はどくかみつき確定。
+  approx(rate(transformTargetActivationTransitions('poison_bite', 'どくかみつき', 0)), 5 / 12);
+  approx(rate(transformTargetActivationTransitions('poison_bite', 'どくかみつき', 1)), 1 / 2);
+  approx(rate(transformTargetActivationTransitions('poison_bite', 'どくかみつき', 2)), 1);
+
+  // 大魔皇トカイ: 4リールでとけるいき確定。
+  approx(rate(transformTargetActivationTransitions('melting_breath', 'とけるいき', 0)), 10 / 27);
+  approx(rate(transformTargetActivationTransitions('melting_breath', 'とけるいき', 1)), 4 / 9);
+  approx(rate(transformTargetActivationTransitions('melting_breath', 'とけるいき', 2)), 2 / 3);
+  approx(rate(transformTargetActivationTransitions('melting_breath', 'とけるいき', 3)), 1);
+
+  // クリア・ブルードラゴンのユーザー確認済みアクアブレス型。
+  approx(rate(transformTargetActivationTransitions('aqua_breath', 'アクアブレス', 0)), 1 / 6);
+  approx(rate(transformTargetActivationTransitions('aqua_breath', 'アクアブレス', 1)), 1 / 2);
+  approx(rate(transformTargetActivationTransitions('aqua_breath', 'アクアブレス', 2)), 1 / 6);
+  approx(rate(transformTargetActivationTransitions('aqua_breath', 'アクアブレス', 3)), 0);
+
+  // アルカード会心型。☆3なので4リール停止時は最上位の3リールを使う。
+  approx(rate(transformTargetActivationTransitions('critical_hit', '会心の一撃', 0)), 125 / 216);
+  approx(rate(transformTargetActivationTransitions('critical_hit', '会心の一撃', 1)), 25 / 36);
+  approx(rate(transformTargetActivationTransitions('critical_hit', '会心の一撃', 2)), 5 / 6);
+  approx(rate(transformTargetActivationTransitions('critical_hit', '会心の一撃', 3)), 5 / 6);
+
+  const missing = SKILL_PRESETS
+    .filter(x => x.selectable !== false)
+    .map(x => x.id)
+    .filter(id => id !== 'fire2' && !TRANSFORM_PROFILE_BY_SKILL[id]);
+  assert.deepEqual(missing, [], `変化用プロファイル未登録: ${missing.join(', ')}`);
+}
+
+// 35) 変化用ファイア!!の発動率が撃破確率本体にも掛かる。
+{
+  const make = characterId => {
+    const s = cloneDefaultState();
+    s.allyCount = 1;
+    s.allies[0] = { characterId, attack: '100', speed: '100', star: '4', attribute: 'fire', commandVariant: '' };
+    s.enemy.maxHp = '1';
+    s.enemy.speed = '1';
+    const p = SKILL_PRESET_BY_ID.get('fire2');
+    s.turns[0].allyActions[0] = { ...p, skillPresetId: 'fire2' };
+    s.turns[0].enemyAction.enabled = false;
+    return simulateKillProbability(s).killChance;
+  };
+  // ファイア!!以外に止まっても、ファイア!!! / !!!! を実際に実行するためHP1は全枝で撃破。
+  approx(make('son_goku'), 1, 1e-12);
+  approx(make('gyumao'), 1, 1e-12);
+}
+
+
+// 36) v0.5.11: 実コマンド分岐は「成功/失敗」ではなく、止まった技名そのものを返す。
+{
+  const xs = normalCommandTransitions('gate_dante', 'こうげき！', 0);
+  const prob = name => xs.filter(x => x.commandName === name).reduce((a, x) => a + x.probability, 0);
+  approx(prob('こうげき！'), 1 / 6);
+  approx(prob('会心の一撃'), 5 / 6);
+
+  const f1 = transformTargetCommandTransitions('fire2', 'ファイア!!', 0);
+  approx(f1.filter(x => x.commandName === 'ファイア!!').reduce((a, x) => a + x.probability, 0), 1);
+  const f2 = transformTargetCommandTransitions('fire2', 'ファイア!!', 1);
+  approx(f2.filter(x => x.commandName === 'ファイア!!').reduce((a, x) => a + x.probability, 0), 1 / 2);
+  approx(f2.filter(x => x.commandName === 'ファイア!!!').reduce((a, x) => a + x.probability, 0), 1 / 2);
+}
+
+// 37) v0.5.11: 変化用も目当て技以外に止まった場合、その技のダメージを実行する。
+// ファイア!!(150%)では倒せず、ファイア!!!(200%)/!!!!(250%)なら倒せるHPで検証。
+{
+  const make = characterId => {
+    const s = cloneDefaultState();
+    s.allyCount = 1;
+    s.allies[0] = { characterId, attack: '100', speed: '100', star: '4', attribute: 'fire', commandVariant: '' };
+    s.enemy.maxHp = '170';
+    s.enemy.attribute = 'fire';
+    s.enemy.speed = '1';
+    const p = SKILL_PRESET_BY_ID.get('fire2');
+    s.turns[0].allyActions[0] = { ...p, skillPresetId: 'fire2' };
+    s.turns[0].enemyAction.enabled = false;
+    return simulateKillProbability(s).killChance;
+  };
+  approx(make('son_goku'), 1 / 2, 1e-12);
+  approx(make('gyumao'), 5 / 8, 1e-12);
+}
+
+// 38) v0.5.14: 直近の内部照合で確定した主要技差分。
+{
+  const rock = SKILL_PRESET_BY_ID.get('rock_throw');
+  assert.deepEqual(rock.raceSkillMultipliers, { angel: '90', birdBeast: '90' });
+
+  const shiden = SKILL_PRESET_BY_ID.get('shiden');
+  assert.equal(shiden.skillMultiplier, '100', '紫電はユーザー指定どおり100%固定にする');
+
+  const tail = SKILL_PRESET_BY_ID.get('dragon_tail');
+  assert.deepEqual(tail.effects, [{ type: 'poison', chance: '25' }]);
+
+  const light = SKILL_PRESET_BY_ID.get('light_breath');
+  assert.equal(light.undeadSkillMultiplier, '180');
+  assert.deepEqual(light.raceSkillMultipliers, { demon: '180' });
+
+  const holy = SKILL_PRESET_BY_ID.get('holy_strike');
+  assert.equal(holy.undeadSkillMultiplier, '360');
+
+  const ice = SKILL_PRESET_BY_ID.get('ice_storm_strike');
+  assert.deepEqual([ice.attackAttribute, ice.attackAttribute2], ['wind', 'ice']);
+
+  const boom = SKILL_PRESET_BY_ID.get('self_destruct');
+  assert.equal(boom.selfDestruct, true);
+}
+
+// 39) 岩飛ばしは通常180%、天使・鳥獣90%。
+{
+  const run = race => {
+    const s = cloneDefaultState();
+    s.allyCount = 1;
+    s.allies[0] = { characterId: '', attack: '100', speed: '100', star: '4', attribute: 'earth', commandVariant: '' };
+    s.enemy.maxHp = '150';
+    s.enemy.attribute = 'fire';
+    s.enemy.race = race;
+    s.enemy.speed = '1';
+    const p = SKILL_PRESET_BY_ID.get('rock_throw');
+    s.turns[0].allyActions[0] = { ...p, skillPresetId: p.id };
+    s.turns[0].enemyAction.enabled = false;
+    return simulateKillProbability(s).killChance;
+  };
+  approx(run('normal'), 1);
+  approx(run('angel'), 0);
+  approx(run('birdBeast'), 0);
+}
+
+// 40) 光のいきは悪魔・アンデッド180%、聖なる一撃はアンデッド360%。
+{
+  const run = (presetId, race, hp) => {
+    const s = cloneDefaultState();
+    s.allyCount = 1;
+    s.allies[0] = { characterId: '', attack: '100', speed: '100', star: '4', attribute: 'light', commandVariant: '' };
+    s.enemy.maxHp = String(hp);
+    s.enemy.attribute = 'earth';
+    s.enemy.race = race;
+    s.enemy.speed = '1';
+    const p = SKILL_PRESET_BY_ID.get(presetId);
+    s.turns[0].allyActions[0] = { ...p, skillPresetId: p.id };
+    s.turns[0].enemyAction.enabled = false;
+    return simulateKillProbability(s).killChance;
+  };
+  approx(run('light_breath', 'normal', 170), 0);
+  approx(run('light_breath', 'demon', 170), 1);
+  approx(run('holy_strike', 'normal', 250), 0);
+  approx(run('holy_strike', 'undead', 250), 1);
+}
+
+// 41) 竜のしっぽの毒25%は確率分岐し、次の敵タイミングで毒ダメージへつながる。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.allies[0] = { characterId: '', attack: '1', speed: '100', star: '1', attribute: 'wind', commandVariant: '' };
+  s.enemy.maxHp = '100';
+  s.enemy.attribute = 'fire';
+  s.enemy.race = 'normal';
+  s.enemy.speed = '50';
+  const p = SKILL_PRESET_BY_ID.get('dragon_tail');
+  s.turns[0].allyActions[0] = { ...p, skillPresetId: p.id };
+  s.turns[0].enemyAction.enabled = false;
+  s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  s.turns[1].allyActions[0] = { kind: 'skip', skillName: '', effects: [] };
+  const r = simulateKillProbability(s);
+  // 攻撃力1×90%は整数化で0ダメージ。毒枝だけ100→90。
+  approx(r.hpDistribution.get(90) ?? 0, 0.25, 1e-12);
+  approx(r.hpDistribution.get(100) ?? 0, 0.75, 1e-12);
+}
+
+// 42) 自爆後は使用者が離脱し、次ターンの設定行動を行わない。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.allies[0] = { characterId: '', attack: '100', speed: '100', star: '4', attribute: 'fire', commandVariant: '' };
+  s.enemy.maxHp = '250';
+  s.enemy.attribute = 'fire';
+  s.enemy.speed = '1';
+  const boom = SKILL_PRESET_BY_ID.get('self_destruct');
+  s.turns[0].allyActions[0] = { ...boom, skillPresetId: boom.id };
+  s.turns[0].enemyAction.enabled = false;
+  s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  s.turns[1].allyActions[0] = { kind: 'attack', skillMultiplier: '300', attackAttribute: 'none', attackType: 'physical', hits: '1', effects: [] };
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 0);
+}
+
+// 43) つるぎの舞は初回1.20→自動1.25→1.30→1.35を重ねる。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 2;
+  s.allies[0] = { characterId: '', attack: '1', speed: '100', star: '3', attribute: 'fire', commandVariant: '' };
+  s.allies[1] = { characterId: '', attack: '100', speed: '90', star: '4', attribute: 'fire', commandVariant: '' };
+  s.enemy.maxHp = '250';
+  s.enemy.attribute = 'fire';
+  s.enemy.race = 'normal';
+  s.enemy.speed = '1';
+  const dance = SKILL_PRESET_BY_ID.get('sword_dance');
+  s.turns[0].allyActions[0] = { ...dance, skillPresetId: dance.id };
+  s.turns[0].allyActions[1] = { kind: 'skip', skillName: '', effects: [] };
+  s.turns[0].enemyAction.enabled = false;
+  for (let i = 1; i < 4; i++) s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  // 2～4ターン目の踊り子の画面設定はスキップでも、自動継続が優先される。
+  for (let i = 1; i < 4; i++) s.turns[i].allyActions[0] = { kind: 'skip', skillName: '', effects: [] };
+  s.turns[3].allyActions[1] = { kind: 'attack', skillMultiplier: '100', attackAttribute: 'none', attackType: 'physical', hits: '1', effects: [] };
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 100 / 101, 1e-12);
+}
+
+
+// 44) v0.5.51: マシュまろ3体はHPを個別追跡し、全体攻撃は3体すべてへ同時に当たる。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy.presetId = 'new5_mashumaro';
+  s.enemy.maxHp = '250';
+  s.enemy.attribute = 'water';
+  s.enemy.race = 'normal';
+  s.enemy.speed = '62';
+  s.allies[0] = { characterId:'', attack:'200', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  const boom = SKILL_PRESET_BY_ID.get('self_destruct');
+  s.turns[0].allyActions[0] = { ...boom, skillPresetId:boom.id };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 1);
+  approx(r.hpDistribution.get('0,0,0') ?? 0, 1, 1e-12);
+}
+
+// 45) v0.5.51: 単体選択攻撃は1体へ集中するため、1回で3体同時撃破にはならない。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy.presetId = 'new5_mashumaro';
+  s.enemy.maxHp = '250';
+  s.enemy.attribute = 'water';
+  s.enemy.race = 'normal';
+  s.enemy.speed = '62';
+  s.allies[0] = { characterId:'', attack:'400', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'attack', skillPresetId:'deadly_blow', skillName:'必殺の一撃', skillMultiplier:'250', attackAttribute:'none', attackType:'physical', enemyTarget:'single', hits:'1', effects:[] };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 0);
+  assert.ok([...r.hpDistribution.keys()].every(key => String(key).startsWith('0,250,250')));
+}
+
+// 46) v0.5.52: 敵EXゲージが10に達した枝は、次の敵行動機会でEX発動＝周回失敗として除外する。
+{
+  const make = enabled => {
+    const s = cloneDefaultState();
+    s.allyCount = 2;
+    s.enemy.presetId = 'new5_mashumaro';
+    s.enemy.maxHp = '250';
+    s.enemy.attribute = 'water';
+    s.enemy.race = 'normal';
+    s.enemy.speed = '62';
+    s.allies[0] = { characterId:'', attack:'1', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+    s.allies[1] = { characterId:'', attack:'400', speed:'10', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+    // 3体への10hit全体攻撃で敵EXは30加算され、10で上限。BOSS行動がA2より先に来る。
+    s.turns[0].allyActions[0] = { kind:'attack', skillName:'EX試験10hit', skillMultiplier:'1', attackAttribute:'none', attackType:'physical', enemyTarget:'all', hits:'10', effects:[] };
+    const boom = SKILL_PRESET_BY_ID.get('self_destruct');
+    s.turns[0].allyActions[1] = { ...boom, skillPresetId:boom.id };
+    s.turns[0].enemyAction.enabled = enabled;
+    return simulateKillProbability(s);
+  };
+  const on = make(true);
+  approx(on.killChance, 0);
+  approx(on.enemyExFailureChance, 1);
+
+  const off = make(false);
+  approx(off.killChance, 1);
+  approx(off.enemyExFailureChance ?? 0, 0);
+}
+
+
+// 47) v0.5.53: 〖ぬすむ〗はプレイヤー共有EX残量に応じて0/1/2/3/4を移す。
+{
+  assert.deepEqual(
+    Array.from({ length:11 }, (_, gauge) => stealExAmount(gauge)),
+    [0,1,1,1,2,2,2,3,3,3,4]
+  );
+  assert.deepEqual(stealExTransfer(0, 6), { stolen:0, playerGauge:0, enemyGauge:6 });
+  assert.deepEqual(stealExTransfer(6, 7), { stolen:2, playerGauge:4, enemyGauge:9 });
+  assert.deepEqual(stealExTransfer(10, 8), { stolen:4, playerGauge:6, enemyGauge:10 });
+}
+
+// 48) v0.5.53: 敵攻撃の被弾はプレイヤーEXへ反映。全体攻撃は各対象への各ヒットを数える。
+{
+  assert.equal(playerExGainFromEnemyAttack(1, 'random', 3), 1);
+  assert.equal(playerExGainFromEnemyAttack(5, 'randomEachHit', 3), 5);
+  assert.equal(playerExGainFromEnemyAttack(1, 'all', 3), 3);
+  assert.equal(playerExGainFromEnemyAttack(2, 'all', 3), 6);
+  assert.equal(playerExGainFromEnemyAttack(2, 'all', 0), 0);
+}
+
+// 49) v0.5.53: 実際のBOSS攻撃でも被弾数がプレイヤーEXへ入る。
+// ダークバハムート1リールは単体攻撃2/6・全体攻撃4/6なので、3体編成ではEX1とEX3に分岐する。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 3;
+  for (let i = 0; i < 3; i++) {
+    s.allies[i] = { characterId:'', attack:'1', speed:String(3 - i), star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+    s.turns[0].allyActions[i] = { kind:'skip', skillName:'', effects:[] };
+  }
+  s.enemy.presetId = 'q_dark_bahamut';
+  s.enemy.maxHp = '9999';
+  s.enemy.attribute = 'dark';
+  s.enemy.race = 'dragon';
+  s.enemy.speed = '100';
+  s.turns[0].enemyAction.enabled = true;
+  const r = simulateKillProbability(s);
+  approx(r.playerExGaugeDistribution.get(1) ?? 0, 1 / 3, 1e-12);
+  approx(r.playerExGaugeDistribution.get(3) ?? 0, 2 / 3, 1e-12);
+}
+
+// 50) v0.5.53: ドック・ローの再行動技で敵EXが10になった場合、再抽選より先にEX発動失敗へ入る。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 2;
+  s.allies[0] = { characterId:'', attack:'1', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.allies[1] = { characterId:'', attack:'1', speed:'1', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.enemy.presetId = 'q_dock_low';
+  s.enemy.maxHp = '9999';
+  s.enemy.attribute = 'water';
+  s.enemy.race = 'normal';
+  s.enemy.speed = '75';
+  // A1の9hitで敵EX=9。BOSSはA1とA2の間に行動する。
+  // 1リール目で月明(2/6)を引けばEX+1後の即時再行動機会がEX発動となり、その枝は失敗する。
+  s.turns[0].allyActions[0] = { kind:'attack', skillName:'EX9テスト', skillMultiplier:'1', attackAttribute:'none', attackType:'physical', hits:'9', effects:[] };
+  s.turns[0].allyActions[1] = { kind:'skip', skillName:'', effects:[] };
+  s.turns[0].enemyAction.enabled = true;
+  const r = simulateKillProbability(s);
+  assert.ok(r.enemyExFailureChance > 1 / 3);
+  assert.ok(r.enemyExFailureChance < 1);
+}
+
+// 51) v0.5.54: 固定お供は個別HPを持ち、BOSSだけ倒しても敵チーム撃破にはならない。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy = { presetId:'old1_grim', maxHp:'100', attribute:'wind', race:'normal', attack:'1', speed:'1' };
+  s.allies[0] = { characterId:'', attack:'200', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'attack', skillName:'単体試験', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', enemyTarget:'single', enemyTargetSlot:'0', hits:'1', effects:[] };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 0);
+  assert.ok([...r.hpDistribution.keys()].every(key => String(key) === '0,37,37'));
+}
+
+// 52) v0.5.54: 全体攻撃はBOSSと生存お供すべてへ当たり、全滅で撃破成功になる。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy = { presetId:'old1_grim', maxHp:'100', attribute:'wind', race:'normal', attack:'1', speed:'1' };
+  s.allies[0] = { characterId:'', attack:'200', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'attack', skillName:'全体試験', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', enemyTarget:'all', hits:'1', effects:[] };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 1);
+  approx(r.hpDistribution.get('0,0,0') ?? 0, 1, 1e-12);
+}
+
+// 53) v0.5.54: 単体選択ではお供を明示指定でき、倒されたお供は同ターン後半に行動しない。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy = { presetId:'new1_robo_03', maxHp:'9999', attribute:'earth', race:'normal', attack:'55', speed:'25' };
+  s.allies[0] = { characterId:'', attack:'200', speed:'200', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  // hpSlot 1 = ロボ零壱式。HP72なので確定撃破する。
+  s.turns[0].allyActions[0] = { kind:'attack', skillName:'お供狙い', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', enemyTarget:'single', enemyTargetSlot:'1', hits:'1', effects:[] };
+  s.turns[0].enemyAction.enabled = true;
+  const r = simulateKillProbability(s);
+  assert.equal(r.enemySkillActivation[0]['お供:ロボ零壱式 / アイアンクロー'] ?? 0, 0);
+  assert.ok([...r.hpDistribution.keys()].every(key => String(key).split(',')[1] === '0'));
 }

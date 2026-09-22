@@ -432,3 +432,19 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px c
   font-weight: 700;
   opacity: .78;
 }
+
+/* v0.5.13: 撃破確率 BOSSプリセット */
+.boss-preset-field { margin-bottom: 10px; }
+.boss-preset-info {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+.boss-preset-info strong { font-size: 14px; }
+.boss-preset-info small { color: var(--muted); }
+.panel-note { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
