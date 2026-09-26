@@ -210,7 +210,6 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px c
 .mini-field { display: grid; gap: 5px; min-width: 0; }
 .mini-field > span { color: var(--muted); font-size: 11px; font-weight: 700; }
 .mini-field input, .mini-field select { min-height: 38px; }
-.rule-note-panel p { margin-top: 8px; }
 .turn-stack { display: grid; gap: 12px; }
 .turn-heading { align-items: center; }
 .turn-actions { display: flex; gap: 7px; }
@@ -473,3 +472,75 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px c
 }
 .final-turn-cutoff-box .mini-field { max-width: 360px; }
 .final-turn-cutoff-box .inline-note { margin: 0; color: var(--muted); line-height: 1.5; }
+
+
+/* v0.6.06: 撃破確率 コマンド型表示／内訳ポップアップ */
+.command-type-field { overflow: visible; }
+.command-type-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.command-type-row select { flex: 1 1 auto; min-width: 0; }
+.fixed-command-type {
+  flex: 1 1 auto;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--panel) 94%, var(--accent) 6%);
+  font-weight: 700;
+  line-height: 1.3;
+}
+.command-info { position: relative; display: inline-flex; flex: 0 0 auto; }
+.command-info-button {
+  width: 25px;
+  height: 25px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.command-info-button:hover,
+.command-info-button:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.command-popover {
+  display: none;
+  position: absolute;
+  z-index: 50;
+  right: 0;
+  top: calc(100% + 7px);
+  width: min(520px, calc(100vw - 42px));
+  max-height: min(68vh, 560px);
+  overflow: auto;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  color: var(--text);
+  text-align: left;
+}
+.command-info:hover .command-popover,
+.command-info:focus-within .command-popover,
+.command-info.is-open .command-popover { display: block; }
+.command-popover > strong { display: block; margin-bottom: 8px; font-size: 13px; }
+.command-sample-grid { display: grid; gap: 8px; }
+.command-sample-reel {
+  display: grid;
+  grid-template-columns: 54px minmax(0,1fr);
+  gap: 8px;
+  align-items: start;
+}
+.command-sample-reel > strong { padding-top: 5px; text-align: center; white-space: nowrap; }
+.command-sample-slots { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 4px 8px; }
+.command-sample-slots span { display: grid; grid-template-columns: 18px minmax(0,1fr); gap: 5px; align-items: baseline; font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
+.command-sample-slots b { color: var(--muted); font-size: 10px; text-align: right; }
+.command-sample-empty { color: var(--muted); font-size: 11px; }
+@media (max-width: 520px) {
+  .command-popover { position: fixed; left: 12px; right: 12px; top: 18%; width: auto; max-height: 68vh; }
+  .command-sample-reel { grid-template-columns: 42px minmax(0,1fr); }
+  .command-sample-slots { grid-template-columns: 1fr; }
+}

@@ -782,6 +782,8 @@ const ATTACK1_VARIANT_CHARACTERS = new Set([
 ]);
 
 function commandProfileId(characterId, skillName = '', commandVariant = '') {
+  if (characterId === 'raijin_kukulkan') return commandVariant === 'roaring' ? 'raijin_kukulkan_roaring' : 'raijin_kukulkan';
+  // 旧保存データ／回帰テスト互換。公開UIではこれらの重複型を表示しない。
   if (ATTACK1_VARIANT_CHARACTERS.has(characterId) && commandVariant === 'attack1') return `${characterId}_attack1`;
   if (characterId === 'soccerra' && commandVariant === 'deadly3') return 'soccerra_deadly3';
   if (characterId === 'mimitoshishi') {
@@ -1109,6 +1111,24 @@ export function activationTransitionsFor({ characterId, skillPresetId, skillName
   if (characterId === 'son_goku') return transformActivationTransitions('猿', skillPresetId, skillName, startReel, commandVariant);
   if (characterId === 'gyumao') return transformActivationTransitions('牛', skillPresetId, skillName, startReel, commandVariant);
   return normalActivationTransitions(characterId, skillName, startReel, commandVariant);
+}
+
+export function commandProfileMatrixForCharacter(characterId, skillName = '', commandVariant = '') {
+  const matrix = COMMAND_PROFILES[commandProfileId(characterId, skillName, commandVariant)];
+  return matrix ? matrix.map(reel => reel.slice()) : null;
+}
+
+export function transformSelfCommandMatrix(characterId, commandVariant = '') {
+  const reels = transformSelfReels(characterId, commandVariant);
+  if (!reels) return null;
+  return reels.map((reel, index) => {
+    const nextStars = '★'.repeat(Math.min(4, index + 2));
+    const moveLabel = index < 3 ? `${'★'.repeat(index + 1)}→${nextStars}` : '';
+    const row = [];
+    for (let i = 0; i < Number(reel.miss || 0); i++) row.push('七十二変化の術');
+    for (let i = 0; i < Number(reel.move || 0); i++) row.push(moveLabel || '七十二変化の術');
+    return row;
+  });
 }
 
 export function hasCommandProfile(characterId, skillName = '', commandVariant = '') {

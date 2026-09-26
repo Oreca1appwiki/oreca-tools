@@ -6,7 +6,7 @@ import {
 import { BOSS_PRESET_BY_ID } from './boss-presets.js';
 import { SKILL_PRESET_BY_ID, normalizeSkillName, presetIdForSkillName } from './presets.js';
 import { OLD5_PRECOMPUTED_RESULTS, reviveOld5PrecomputedResult } from './old5-precomputed.js';
-// 撃破確率シミュレータ v0.6.04
+// 撃破確率シミュレータ v0.6.06
 // 公開用の撃破確率計算に必要な戦闘要素だけを扱います。
 
 export const DEFENDER_ATTRIBUTES = Object.freeze([
@@ -20,7 +20,7 @@ export const ENEMY_ATTRIBUTE_OPTIONS = Object.freeze([
 ]);
 
 export const ENEMY_RACE_OPTIONS = Object.freeze([
-  ['normal', '通常'], ['undead', 'アンデッド'], ['demon', '悪魔'], ['angel', '天使'], ['birdBeast', '鳥獣'], ['waterRace', '水族'], ['machine', '機械']
+  ['normal', '指定なし'], ['undead', 'アンデッド'], ['demon', '悪魔'], ['angel', '天使'], ['birdBeast', '鳥獣'], ['waterRace', '水族'], ['machine', '機械']
 ]);
 
 export const ATTACK_TYPE_OPTIONS = Object.freeze([
@@ -76,8 +76,8 @@ export const ENEMY_EFFECT_TYPES = Object.freeze([
   ['enemyDefenseDebuff', '防御デバフ'],
   ['enemyDamageReduction', '防御アップ'],
   ['enemyCounterGuard', 'カウンター（防御部分）'],
-  ['enemyBlessing', '敵の加護'],
-  ['enemySpeedBuff', '敵の素早さアップ'],
+  ['enemyBlessing', '加護'],
+  ['enemySpeedBuff', '素早さアップ'],
   ['heal', '回復']
 ]);
 
@@ -982,6 +982,13 @@ function allyTargetedEnemySlots(runtime, hp, action = {}) {
   // この関数を回避枝の事前生成にも使うため、randomでは候補一覧を返す。
   if (targetMode === 'random') return eligible;
   const preferredRaw = action?.enemyTargetSlot ?? 'auto';
+  if (preferredRaw === 'companionFirst') {
+    const bossSlots = bossHpSlotCount(runtime);
+    const companionSlot = eligible.find(slot => slot >= bossSlots);
+    const bossSlot = eligible.find(slot => slot < bossSlots);
+    const slot = companionSlot ?? bossSlot ?? -1;
+    return slot >= 0 ? [slot] : [];
+  }
   const preferred = preferredRaw === 'auto' || preferredRaw === '' || preferredRaw == null ? -1 : Math.trunc(Number(preferredRaw));
   const slot = Number.isInteger(preferred) && eligible.includes(preferred) ? preferred : (eligible[0] ?? -1);
   return slot >= 0 ? [slot] : [];
@@ -1197,6 +1204,7 @@ let SMALL_CACHE_HITS=0, SMALL_CACHE_MISSES=0; const SMALL_CACHE_BY_ACTION = new 
 function canUseSmallEnemySingleTargetCache(runtime, hpDist, action) {
   const mode = action?.enemyTarget ?? 'single';
   if (mode === 'all' || mode === 'random') return false;
+  if (action?.enemyTargetSlot === 'companionFirst') return false;
   const companions = runtime?.companions ?? [];
   if (bossHpSlotCount(runtime) !== 1 || companions.length < 1 || companions.length > 2) return false;
   if (runtime?.enemy?.singleTargetUntargetable) return false;
@@ -2472,8 +2480,8 @@ function finalTurnCutoffLabel(state) {
   const mode = String(state?.finalTurnCutoff ?? 'lastAlly');
   if (mode === 'turnEnd') return 'ターン終了まで';
   const allyMatch = /^ally([1-3])$/.exec(mode);
-  if (allyMatch) return `キャラ${allyMatch[1]}の行動機会直後`;
-  return '最後の味方行動直後';
+  if (allyMatch) return `キャラ${allyMatch[1]}の行動後`;
+  return '最後の味方行動後';
 }
 
 function recordTimeline(timeline, label, hpDist, turn, kind) {
@@ -2673,7 +2681,7 @@ function simulateKillProbabilityLegacy(state) {
           const labelMap = {
             none: '効果なし', allyAtkDebuff: '攻撃デバフ', allySpeedDebuff: '素早さデバフ',
             enemyAtkBuff: '敵の攻撃アップ', enemyDefenseBuff: '防御バフ', enemyDefenseDebuff: '防御デバフ', enemyDamageReduction: '防御アップ',
-            enemyCounterGuard: 'カウンター（防御部分）', enemyBlessing: '敵の加護', enemySpeedBuff: '敵の素早さアップ', heal: '回復'
+            enemyCounterGuard: 'カウンター（防御部分）', enemyBlessing: '加護', enemySpeedBuff: '素早さアップ', heal: '回復'
           };
           recordTimeline(timeline, `敵 ${repeated ? '同行動→' : ''}${labelMap[effect.type] ?? '効果なし'}`, hpDist, turnIndex + 1, 'enemy');
         } else {

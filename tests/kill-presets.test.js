@@ -61,7 +61,8 @@ assert.ok(uiSource.includes("transformCharacter ? '変化先の技' : '技プリ
 // v0.5.72: 雷神竜ククルカン〖轟く稲妻〗型を独立プリセットとして保持する。
 assert.deepEqual(COMMAND_PROFILES.raijin_kukulkan_roaring[0], ['はばたき','★→★★','★→★★','★→★★','★→★★','★→★★']);
 assert.deepEqual(COMMAND_PROFILES.raijin_kukulkan_roaring[3], Array(6).fill('轟く稲妻'));
-assert.ok(uiSource.includes("id: 'raijin_kukulkan_roaring'"), 'roaring lightning Kukulkan preset should exist');
+assert.ok(!uiSource.includes("id: 'raijin_kukulkan_roaring'"), 'roaring lightning Kukulkan must be merged into the main preset');
+assert.ok(uiSource.includes("['peck','つつきまくり型'], ['roaring','轟く稲妻型']"), 'Kukulkan type selector should expose both command types');
 
 // v0.5.71: 攻撃対象分類の回帰監査。
 for (const id of [

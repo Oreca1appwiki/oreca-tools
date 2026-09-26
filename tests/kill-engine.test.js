@@ -1316,7 +1316,7 @@ console.log('kill-engine tests: OK');
   base.turns[0].enemyAction.enabled = false;
   const cutoff = simulateKillProbability(base);
   approx(cutoff.killChance, 0);
-  assert.equal(cutoff.finalTurnCutoffLabel, 'キャラ1の行動機会直後');
+  assert.equal(cutoff.finalTurnCutoffLabel, 'キャラ1の行動後');
 
   const full = JSON.parse(JSON.stringify(base));
   full.finalTurnCutoff = 'lastAlly';

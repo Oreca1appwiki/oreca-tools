@@ -23,7 +23,12 @@ import {
   applyBossPresetToEnemy
 } from './boss-presets.js';
 import { enemyBossProfile, enemyCompanionProfile } from './enemy-actions.js';
-import { commandSkillNamesForCharacter, isTransformSkillPresetId } from './commands.js';
+import {
+  commandProfileMatrixForCharacter,
+  commandSkillNamesForCharacter,
+  isTransformSkillPresetId,
+  transformSelfCommandMatrix
+} from './commands.js';
 
 const STORAGE_KEY = 'oreca-tools.kill.v0.4.13';
 const DIRECT_STORAGE_KEYS = ['oreca-tools.kill.v0.4.12', 'oreca-tools.kill.v0.4.11', 'oreca-tools.kill.v0.4.10', 'oreca-tools.kill.v0.4.9'];
@@ -45,7 +50,7 @@ const ENEMY_BUFF_TYPES = Object.freeze([['enemyAtkBuff', '攻撃力'], ['enemySp
 const MONSTER_ATTRIBUTE_OPTIONS = Object.freeze([['', '選択してください'], ['fire', '火'], ['water', '水'], ['earth', '土'], ['wind', '風']]);
 
 const CHARACTER_PRESETS = Object.freeze([
-  { id: '', name: '選択なし', group: 'none', skill: '', attack: '0', speed: '0' },
+  { id: '', name: '手動入力', group: 'none', skill: '', attack: '0', speed: '0' },
   { id: 'son_goku', name: '斉天大聖ソンゴクウ', group: 'general', skill: 'ロキブランド', attack: '84', speed: '78', star: '4', attribute: 'wind', kind: 'buff' },
   { id: 'gyumao', name: '牛魔王', group: 'general', skill: '鬼の気合入れ', attack: '94', speed: '15', star: '4', attribute: 'fire', kind: 'buff' },
   { id: 'sylph', name: 'シルフ', group: 'general', skill: 'こうげき！', attack: '31', speed: '42', star: '1', attribute: 'wind', kind: 'attack' },
@@ -62,7 +67,6 @@ const CHARACTER_PRESETS = Object.freeze([
   { id: 'oniwaka', name: 'オニワカ', group: 'general', skill: '足ばらい', attack: '57', speed: '42', star: '2', attribute: 'wind', kind: 'attack' },
   { id: 'red_empress', name: '赤のエンプレス', group: 'general', skill: '行動スキップ', attack: '63', speed: '84', star: '4', attribute: 'water', kind: 'skip' },
   { id: 'raijin_kukulkan', name: '雷神竜ククルカン', group: 'general', skill: 'つつきまくり', attack: '78', speed: '89', star: '4', attribute: 'wind', kind: 'attack' },
-  { id: 'raijin_kukulkan_roaring', name: '雷神竜ククルカン〖轟く稲妻〗型', group: 'general', skill: '轟く稲妻', attack: '78', speed: '89', star: '4', attribute: 'wind', kind: 'attack' },
   { id: 'venom_behemoth', name: '猛毒竜ベヒモス', group: 'general', skill: 'おしつぶし', attack: '73', speed: '15', star: '4', attribute: 'earth', kind: 'attack' },
   { id: 'heavy_behemoth', name: '重竜ベヒモス', group: 'general', skill: 'おしつぶし', attack: '63', speed: '10', star: '4', attribute: 'earth', kind: 'attack' },
   { id: 'kerogon_yellow', name: 'ケロゴン(黄)', group: 'general', skill: '竜のしっぽ', attack: '31', speed: '21', star: '1', attribute: 'earth', kind: 'attack' },
@@ -118,7 +122,7 @@ const CHARACTER_PRESETS = Object.freeze([
 const CHARACTER_USAGE_ORDER = Object.freeze([
   'son_goku','gyumao','loki','kerogon_green','camineko','bero','magora','guardian_powan','dark_bahamut',
   'oniwaka_monk','clear_blue_dragon','docteur','dartan','kerogon_yellow','kerogon_blue','kerogon_gold',
-  'raijin_kukulkan','raijin_kukulkan_roaring','kenran_kukulkan','shinjuryu_kukulkan','venom_behemoth','heavy_behemoth',
+  'raijin_kukulkan','kenran_kukulkan','shinjuryu_kukulkan','venom_behemoth','heavy_behemoth',
   'red_empress','oniwaka','platinum_drake','scarlet_dragon','sylph','crow','garanezumi','ifrit','red_magician','magician','beige',
   'black_knight_gebolg','rakshasa','bahamut','mimitoshishi','astaroth',
   // 条件枠
@@ -127,6 +131,31 @@ const CHARACTER_USAGE_ORDER = Object.freeze([
   'simon','hayate','sky_clay','djinn','great_mimitoshishi','great_cliff','gate_dante','yamato','susanoo','soccerra'
 ]);
 const CHARACTER_USAGE_RANK = new Map(CHARACTER_USAGE_ORDER.map((id, i) => [id, i]));
+
+
+const COMMAND_TYPE_VARIANTS = Object.freeze({
+  son_goku: Object.freeze([
+    ['stop1','1止め'], ['stop2','2止め'], ['stop24','2-4止め'], ['stop3','3止め'], ['forward4','4送り']
+  ]),
+  gyumao: Object.freeze([
+    ['stop1','1止め'], ['stop2','2止め'], ['stop24','2-4止め'], ['stop3','3止め'], ['forward4','4送り']
+  ]),
+  mimitoshishi: Object.freeze([
+    ['attack6','こうげき！×6型'], ['mixed','プチ・アイスストーム型']
+  ]),
+  red_empress: Object.freeze([
+    ['support','せいえん／ごほうび型'], ['critical5','会心5型'], ['critical4','会心4型']
+  ]),
+  raijin_kukulkan: Object.freeze([
+    ['peck','つつきまくり型'], ['roaring','轟く稲妻型']
+  ])
+});
+
+const SINGLE_COMMAND_TYPE_LABELS = Object.freeze({
+  camineko: '属性魔法型',
+  dark_bahamut: '属性ブレス型',
+  elysion: '浄化の炎型'
+});
 
 // 技もカテゴリ内で使用頻度順。忍法・ポイント・属性ブレス等の同系統は連続配置する。
 const SKILL_USAGE_ORDER = Object.freeze([
@@ -246,6 +275,10 @@ function normalizeState(saved, legacyAmounts = false, attackBuffAmountNotation =
   state.finalTurnCutoff = allowedFinalTurnCutoffs.has(saved.finalTurnCutoff) ? saved.finalTurnCutoff : (fallback.finalTurnCutoff ?? 'lastAlly');
   state.allies = fallback.allies.map((ally, i) => ({ ...ally, ...(saved.allies?.[i] ?? {}), characterId: saved.allies?.[i]?.characterId ?? ally.characterId ?? '', race: saved.allies?.[i]?.race ?? ally.race ?? 'normal', commandVariant: saved.allies?.[i]?.commandVariant ?? ally.commandVariant ?? '' }));
   state.allies.forEach(ally => {
+    if (ally.characterId === 'raijin_kukulkan_roaring') {
+      ally.characterId = 'raijin_kukulkan';
+      ally.commandVariant = 'roaring';
+    }
     delete ally.hp;
     if (!new Set(ENEMY_RACE_OPTIONS.map(([value]) => value)).has(ally.race)) ally.race = 'normal';
     if (!ally.characterId) {
@@ -264,11 +297,10 @@ function normalizeState(saved, legacyAmounts = false, attackBuffAmountNotation =
       if (!['mixed', 'attack6'].includes(ally.commandVariant)) ally.commandVariant = 'mixed';
     } else if (ally.characterId === 'red_empress') {
       if (!['support', 'critical5', 'critical4'].includes(ally.commandVariant)) ally.commandVariant = 'support';
-    } else if (['gate_dante','yamato','susanoo','nanawarai','ginger_ale','fire_drake'].includes(ally.characterId)) {
-      if (!['default','attack1'].includes(ally.commandVariant)) ally.commandVariant = 'default';
-    } else if (ally.characterId === 'soccerra') {
-      if (!['default','deadly3'].includes(ally.commandVariant)) ally.commandVariant = 'default';
+    } else if (ally.characterId === 'raijin_kukulkan') {
+      if (!['peck', 'roaring'].includes(ally.commandVariant)) ally.commandVariant = 'peck';
     } else {
+      // 単一型モンスターは選択肢を持たせず、確定済みの正規型だけを使用する。
       ally.commandVariant = '';
     }
   });
@@ -325,7 +357,6 @@ function normalizeState(saved, legacyAmounts = false, attackBuffAmountNotation =
         skillName: raw.skillName ?? '',
         presetTarget: raw.presetTarget ?? '',
         fixedCharacterSkill: raw.fixedCharacterSkill ?? '',
-        confusionSkillPresetId: raw.confusionSkillPresetId ?? ''
       };
       // v0.4.2以前にはskillPresetIdが無かったため、既知技は一度だけプリセット値へ移行する。
       if ((raw.skillPresetId === undefined || rawPresetId !== presetId) && presetId) applySkillPresetToAction(normalized, presetId);
@@ -442,7 +473,74 @@ function characterOptionsHtml(selected) {
   const general = sortByUsage(CHARACTER_PRESETS.filter(x => x.id && (x.group === 'general' || x.group === 'both')), CHARACTER_USAGE_RANK);
   const condition = sortByUsage(CHARACTER_PRESETS.filter(x => x.id && (x.group === 'condition' || x.group === 'both')), CHARACTER_USAGE_RANK);
   const render = items => items.map(x => `<option value="${escapeHtml(x.id)}" ${x.id === selected ? 'selected' : ''}>${escapeHtml(x.name)}</option>`).join('');
-  return `<option value="" ${!selected ? 'selected' : ''}>選択なし</option><optgroup label="汎用">${render(general)}</optgroup><optgroup label="条件">${render(condition)}</optgroup>`;
+  return `<option value="" ${!selected ? 'selected' : ''}>手動入力</option><optgroup label="汎用">${render(general)}</optgroup><optgroup label="条件">${render(condition)}</optgroup>`;
+}
+
+
+function commandTypeVariantsFor(characterId) {
+  return COMMAND_TYPE_VARIANTS[characterId] ?? null;
+}
+
+function commandTypeLabelFor(ally) {
+  const characterId = ally?.characterId ?? '';
+  if (!characterId) return '';
+  const variants = commandTypeVariantsFor(characterId);
+  if (variants) {
+    const found = variants.find(([value]) => value === ally.commandVariant) ?? variants[0];
+    return found?.[1] ?? '';
+  }
+  const preset = CHARACTER_BY_ID.get(characterId);
+  return SINGLE_COMMAND_TYPE_LABELS[characterId] ?? (preset?.skill ? `${preset.skill}型` : 'コマンド型');
+}
+
+function commandMatrixForAlly(ally) {
+  const characterId = ally?.characterId ?? '';
+  if (!characterId) return null;
+  if (characterId === 'son_goku' || characterId === 'gyumao') {
+    return transformSelfCommandMatrix(characterId, ally.commandVariant ?? '');
+  }
+  const preset = CHARACTER_BY_ID.get(characterId);
+  if (!preset) return null;
+  let skillName = preset.skill ?? '';
+  if (characterId === 'camineko') {
+    const skill = SKILL_PRESET_BY_ID.get(caminekoPresetForEnemy(state.enemy.attribute));
+    skillName = skill?.name ?? skillName;
+  } else if (characterId === 'dark_bahamut') {
+    const skill = SKILL_PRESET_BY_ID.get(darkBahamutPresetForEnemy(state.enemy.attribute));
+    skillName = skill?.name ?? skillName;
+  }
+  return commandProfileMatrixForCharacter(characterId, skillName, ally.commandVariant ?? '');
+}
+
+function commandSampleHtml(ally) {
+  const matrix = commandMatrixForAlly(ally);
+  if (!matrix?.length) return '<div class="command-sample-empty">コマンド内訳は未登録です。</div>';
+  const stars = ['★','★★','★★★','★★★★','★★★★★','★★★★★★','★★★★★★★','★★★★★★★★'];
+  return `<div class="command-sample-grid">${matrix.map((reel, reelIndex) => `
+    <div class="command-sample-reel">
+      <strong>${stars[reelIndex] ?? `${reelIndex + 1}リール`}</strong>
+      <div class="command-sample-slots">${reel.map((command, slotIndex) => `<span><b>${slotIndex + 1}</b>${escapeHtml(command)}</span>`).join('')}</div>
+    </div>`).join('')}</div>`;
+}
+
+function commandInfoButtonHtml(ally) {
+  const label = commandTypeLabelFor(ally);
+  return `<span class="command-info">
+    <button type="button" class="command-info-button" aria-label="${escapeHtml(label)}のコマンド内訳" aria-expanded="false">i</button>
+    <span class="command-popover" role="tooltip"><strong>${escapeHtml(label)}</strong>${commandSampleHtml(ally)}</span>
+  </span>`;
+}
+
+function commandTypeControlHtml(ally) {
+  const characterId = ally?.characterId ?? '';
+  if (!characterId) return '';
+  const variants = commandTypeVariantsFor(characterId);
+  const hasMatrix = Boolean(commandMatrixForAlly(ally));
+  if (!variants && !hasMatrix) return '';
+  if (variants) {
+    return `<div class="mini-field command-type-field"><span>コマンド型</span><div class="command-type-row"><select class="ally-command-variant">${variants.map(([value, label]) => `<option value="${escapeHtml(value)}" ${ally.commandVariant === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('')}</select>${commandInfoButtonHtml(ally)}</div></div>`;
+  }
+  return `<div class="mini-field command-type-field"><span>コマンド型</span><div class="command-type-row"><span class="fixed-command-type">${escapeHtml(commandTypeLabelFor(ally))}</span>${commandInfoButtonHtml(ally)}</div></div>`;
 }
 
 const SKIP_ACTION_PRESET = '__skip_action__';
@@ -585,10 +683,8 @@ function applyCharacterPreset(allyIndex, characterId) {
     if (!['mixed', 'attack6'].includes(ally.commandVariant)) ally.commandVariant = 'mixed';
   } else if (characterId === 'red_empress') {
     if (!['support', 'critical5', 'critical4'].includes(ally.commandVariant)) ally.commandVariant = 'support';
-  } else if (['gate_dante','yamato','susanoo','nanawarai','ginger_ale','fire_drake'].includes(characterId)) {
-    if (!['default','attack1'].includes(ally.commandVariant)) ally.commandVariant = 'default';
-  } else if (characterId === 'soccerra') {
-    if (!['default','deadly3'].includes(ally.commandVariant)) ally.commandVariant = 'default';
+  } else if (characterId === 'raijin_kukulkan') {
+    if (!['peck', 'roaring'].includes(ally.commandVariant)) ally.commandVariant = 'peck';
   } else {
     ally.commandVariant = '';
   }
@@ -604,10 +700,11 @@ function applyCharacterPreset(allyIndex, characterId) {
       if (preset.kind === 'skip') {
         applySkillPresetToAction(action, SKIP_ACTION_PRESET);
       } else {
-        const presetId = presetIdForCharacterSkill(characterId, preset.skill);
+        const firstSkill = characterId === 'son_goku' ? 'ロキブランド' : characterId === 'gyumao' ? '鬼の気合入れ' : preset.skill;
+        const presetId = presetIdForCharacterSkill(characterId, firstSkill);
         if (presetId) {
           applySkillPresetToAction(action, presetId);
-        } else { action.kind = preset.kind ?? 'attack'; action.skillName = preset.skill; action.skillPresetId = ''; }
+        } else { action.kind = preset.kind ?? 'attack'; action.skillName = firstSkill; action.skillPresetId = ''; }
       }
     } else if (preset.secondSkill && turnIndex === 1) {
       const presetId = presetIdForCharacterSkill(characterId, preset.secondSkill);
@@ -837,7 +934,7 @@ function actionKindOptions(action, turnIndex) {
 function enemyAttackTargetOptionsHtml(selected = 'auto') {
   const preset = BOSS_PRESET_BY_ID.get(state.enemy?.presetId ?? '');
   const bossCount = Math.max(1, Number(preset?.enemyCount ?? 1) || 1);
-  const options = [['auto', '自動（BOSS優先→残存敵）']];
+  const options = [['auto', '自動（BOSS優先→残存敵）'], ['companionFirst', 'お供→ボス']];
   for (let i = 0; i < bossCount; i++) {
     const label = bossCount > 1 ? `${preset?.name ?? 'BOSS'} ${i + 1}` : (preset?.name ?? 'BOSS');
     options.push([String(i), label]);
@@ -882,7 +979,6 @@ function actionCardHtml(action, turnIndex, allyIndex) {
           : `通常は ${escapeHtml(fixedSkillLabel || '技なし')} などをキャラプリセットのコマンド表から自動抽選します。リール移動・ためる・ミス等は表示を省略して内部計算します。`}</p>`
         : action.kind !== 'same' ? `
         <label class="mini-field"><span>${transformCharacter ? '変化先の技' : '技プリセット'}</span><select class="skill-preset">${skillPresetOptionsHtml(action.skillPresetId ?? '', transformCharacter ? 'transform' : 'manual')}</select></label>
-        ${transformCharacter ? `<label class="mini-field"><span>混乱時の変化先（任意）</span><select class="confusion-skill-preset"><option value="">通常と同じ</option>${skillPresetOptionsHtml(action.confusionSkillPresetId ?? '', 'transform').replace('<option value="">選択してください</option>','')}</select></label>` : ''}
         ${presetMeta?.note ? `<p class="inline-note">${escapeHtml(presetMeta.note)}</p>` : ''}${presetMeta?.targetRequired ? `<label class="mini-field"><span>対象</span>${targetSelectHtml(action.presetTarget ?? `ally${allyIndex + 1}`, allyIndex, 'preset-target-select')}</label>` : ''}${presetSelected ? `<p class="inline-note">プリセット効果を自動適用します。効果内容は編集できません。</p>` : ''}` : ''}
       ${action.kind === 'attack' && (action.enemyTarget ?? presetMeta?.enemyTarget ?? 'single') === 'single' ? `<label class="mini-field"><span>攻撃対象</span><select class="enemy-target-slot">${enemyAttackTargetOptionsHtml(action.enemyTargetSlot ?? 'auto')}</select></label>` : ''}
       ${!actionLocked && action.kind === 'attack' ? `
@@ -996,8 +1092,8 @@ function enemyActionHtml(action, turnIndex) {
 
 function finalTurnCutoffOptionsHtml() {
   const options = [
-    ['lastAlly', '最後の味方行動後（従来）'],
-    ...Array.from({ length: state.allyCount }, (_, i) => [`ally${i + 1}`, `キャラ${i + 1}の行動機会直後`]),
+    ['lastAlly', '最後の味方行動後'],
+    ...Array.from({ length: state.allyCount }, (_, i) => [`ally${i + 1}`, `キャラ${i + 1}の行動後`]),
     ['turnEnd', 'ターン終了まで（毒・猛毒判定を含む）']
   ];
   return options.map(([value, label]) => `<option value="${value}" ${state.finalTurnCutoff === value ? 'selected' : ''}>${escapeHtml(label)}</option>`).join('');
@@ -1008,7 +1104,7 @@ function finalTurnCutoffControlHtml(turnIndex) {
   return `
     <div class="final-turn-cutoff-box">
       <label class="mini-field"><span>このターンの計算終了位置</span><select id="finalTurnCutoff">${finalTurnCutoffOptionsHtml()}</select></label>
-      <p class="inline-note">選択したキャラの行動機会直後で計算を止めます。敵行動は手動入力した効果だけを実行し、敵・お供の行動機会では毒・猛毒と敵EX判定も処理します。行動順は各確率分岐のターン開始時の素早さで判定します。</p>
+      <p class="inline-note">選択したキャラの行動後で計算を止めます。敵行動は手動入力した効果だけを実行し、敵・お供の行動機会では毒・猛毒と敵EX判定も処理します。行動順は各確率分岐のターン開始時の素早さで判定します。</p>
     </div>`;
 }
 
@@ -1105,7 +1201,7 @@ function resultHtml(result, error = '', dirty = false) {
         <strong class="kill-verdict">${verdict}</strong>
       </div>
       <div class="result-meta">最終ターン行動順: ${escapeHtml(finalOrder)}</div>
-      <div class="result-meta">計算終了: ${escapeHtml(result.finalTurnCutoffLabel ?? '最後の味方行動直後')}</div>
+      <div class="result-meta">計算終了: ${escapeHtml(result.finalTurnCutoffLabel ?? '最後の味方行動後')}</div>
       ${precomputedExactHtml}
       ${dirty ? '<div class="result-meta error-text"><strong>入力変更あり:</strong> 表示中の結果は前回計算時のものです。再計算してください。</div>' : ''}
       ${enemyModeHtml}
@@ -1177,7 +1273,6 @@ function render() {
         <label class="field"><span class="field-label">素早さ</span><input id="enemySpeed" type="number" inputmode="decimal" min="0" step="0.1" value="${escapeHtml(state.enemy.speed)}"></label>
         <label class="field"><span class="field-label">敵EX許容回数</span><input id="enemyExAllowance" type="number" inputmode="numeric" min="0" max="99" step="1" value="${escapeHtml(state.enemy.enemyExAllowance ?? '0')}"></label>
       </div>
-      <p class="panel-note">この公開版は敵行動を手動入力します。BOSSプリセットを選んでも敵コマンドは自動抽選せず、各ターンで指定した防御バフ／デバフ、防御アップ、攻撃／素早さデバフ、回復などだけを実行します。固定お供のコマンド効果は自動計算しませんが、毒・猛毒と共有敵EXの発動タイミングとして行動機会は残します。敵EXは「敵EX許容回数」を超えた回（0なら1回目、1なら2回目）で撃破失敗にします。</p>
     </section>
 
     <section class="panel">
@@ -1190,56 +1285,22 @@ function render() {
           <div class="ally-card" data-ally-index="${i}">
             <strong>キャラ${i + 1}</strong>
             <label class="mini-field"><span>モンスター</span><select class="ally-character">${characterOptionsHtml(state.allies[i].characterId ?? '')}</select></label>
-            ${(state.allies[i].characterId === 'son_goku' || state.allies[i].characterId === 'gyumao') ? `
-              <label class="mini-field"><span>七十二変化 コマンド型</span><select class="ally-command-variant">
-                <option value="stop1" ${state.allies[i].commandVariant === 'stop1' ? 'selected' : ''}>1止め</option>
-                <option value="stop2" ${state.allies[i].commandVariant === 'stop2' ? 'selected' : ''}>2止め</option>
-                <option value="stop24" ${state.allies[i].commandVariant === 'stop24' ? 'selected' : ''}>2-4止め</option>
-                <option value="stop3" ${state.allies[i].commandVariant === 'stop3' ? 'selected' : ''}>3止め</option>
-                <option value="forward4" ${!['stop1','stop2','stop24','stop3'].includes(state.allies[i].commandVariant) ? 'selected' : ''}>4送り</option>
-              </select></label>` : ''}
-            ${state.allies[i].characterId === 'mimitoshishi' ? `
-              <label class="mini-field"><span>コマンド型</span><select class="ally-command-variant">
-                <option value="attack6" ${state.allies[i].commandVariant === 'attack6' ? 'selected' : ''}>こうげき！×6</option>
-                <option value="mixed" ${state.allies[i].commandVariant !== 'attack6' ? 'selected' : ''}>こうげき！×2＋プチ・アイスストーム×4</option>
-              </select></label>` : ''}
-            ${state.allies[i].characterId === 'red_empress' ? `
-              <label class="mini-field"><span>コマンド型</span><select class="ally-command-variant">
-                <option value="support" ${state.allies[i].commandVariant === 'support' ? 'selected' : ''}>① 今まで通り</option>
-                <option value="critical5" ${state.allies[i].commandVariant === 'critical5' ? 'selected' : ''}>② 3R 会心×5＋こうげき！×1 / 4R 会心×6</option>
-                <option value="critical4" ${state.allies[i].commandVariant === 'critical4' ? 'selected' : ''}>③ 3R 会心×4＋こうげき！×2 / 4R 会心×6</option>
-              </select></label>` : ''}
-            ${['gate_dante','yamato','susanoo','nanawarai','ginger_ale','fire_drake'].includes(state.allies[i].characterId) ? `
-              <label class="mini-field"><span>コマンド型</span><select class="ally-command-variant">
-                <option value="default" ${state.allies[i].commandVariant !== 'attack1' ? 'selected' : ''}>通常型</option>
-                <option value="attack1" ${state.allies[i].commandVariant === 'attack1' ? 'selected' : ''}>こうげき！1止め</option>
-              </select></label>` : ''}
-            ${state.allies[i].characterId === 'soccerra' ? `
-              <label class="mini-field"><span>コマンド型</span><select class="ally-command-variant">
-                <option value="default" ${state.allies[i].commandVariant !== 'deadly3' ? 'selected' : ''}>通常型</option>
-                <option value="deadly3" ${state.allies[i].commandVariant === 'deadly3' ? 'selected' : ''}>必殺の一撃3止め</option>
-              </select></label>` : ''}
+            ${commandTypeControlHtml(state.allies[i])}
             ${state.allies[i].characterId ? `
               <div class="preset-status-summary">
                 <span>攻撃 ${escapeHtml(state.allies[i].attack)}</span>
                 <span>素早さ ${escapeHtml(state.allies[i].speed)}</span>
-                <span>★${escapeHtml(state.allies[i].star)}</span>
+                <span>クラス ★${escapeHtml(state.allies[i].star)}</span>
                 <span>${escapeHtml(optionsLabel(MONSTER_ATTRIBUTE_OPTIONS, state.allies[i].attribute))}属性</span>
               </div>` : `
               <label class="mini-field"><span>攻撃力</span><input class="ally-attack" type="number" inputmode="decimal" min="0" step="0.1" value="${escapeHtml(state.allies[i].attack)}"></label>
               <label class="mini-field"><span>素早さ</span><input class="ally-speed" type="number" inputmode="decimal" min="0" step="0.1" value="${escapeHtml(state.allies[i].speed)}"></label>
-              <label class="mini-field"><span>★の数</span><input class="ally-star" type="number" inputmode="numeric" min="1" max="4" step="1" value="${escapeHtml(state.allies[i].star ?? '')}"></label>
+              <label class="mini-field"><span>クラス</span><input class="ally-star" type="number" inputmode="numeric" min="1" max="4" step="1" value="${escapeHtml(state.allies[i].star ?? '')}"></label>
               <label class="mini-field"><span>属性</span><select class="ally-attribute">${optionsHtml(MONSTER_ATTRIBUTE_OPTIONS, state.allies[i].attribute ?? '')}</select></label>`}
             <label class="mini-field"><span>種族</span><select class="ally-race">${optionsHtml(ENEMY_RACE_OPTIONS, state.allies[i].race ?? 'normal')}</select></label>
           </div>`).join('')}
       </div>
     </section>
-
-    <section class="panel rule-note-panel">
-      <h2>現在の暫定ルール</h2>
-      <p>味方はコマンド6枠を抽選し、リール移動を含めて実際に止まった技を実行します。敵はBOSS行動効果を各ターン手動指定し、プリセットの敵コマンド自動抽選は行いません。固定お供・複数BOSSは個別HPを持つ撃破対象として追跡し、毒・猛毒と共有敵EX判定は各自の行動機会で処理します。行動順は各ターン開始時の素早さで固定します。</p>
-    </section>
-
 
     <div class="calculation-control panel">
       <button type="button" class="primary-button calculate-button" id="calculateKill">計算</button>
@@ -1322,8 +1383,6 @@ function collectStateFromDom() {
       if (fixedCharacterSkill !== undefined) action.fixedCharacterSkill = fixedCharacterSkill;
       const selectedPresetId = card.querySelector('.skill-preset')?.value ?? action.skillPresetId ?? '';
       action.skillPresetId = selectedPresetId;
-      const confusionPresetId = card.querySelector('.confusion-skill-preset')?.value;
-      if (confusionPresetId !== undefined) action.confusionSkillPresetId = confusionPresetId;
       const presetTargetCode = card.querySelector('.preset-target-select')?.value;
       if (presetTargetCode) action.presetTarget = targetFromCode(presetTargetCode)[0] ?? action.presetTarget;
       const enemyTargetSlot = card.querySelector('.enemy-target-slot')?.value;
@@ -1485,7 +1544,18 @@ root.addEventListener('change', event => {
 
 root.addEventListener('click', event => {
   const button = event.target.closest('button');
-  if (!button) return;
+  if (!button) {
+    root.querySelectorAll('.command-info.is-open').forEach(el => el.classList.remove('is-open'));
+    return;
+  }
+  if (button.classList.contains('command-info-button')) {
+    const info = button.closest('.command-info');
+    const nextOpen = !info?.classList.contains('is-open');
+    root.querySelectorAll('.command-info.is-open').forEach(el => el.classList.remove('is-open'));
+    if (info && nextOpen) info.classList.add('is-open');
+    button.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    return;
+  }
   collectStateFromDom();
 
   if (button.id === 'calculateKill') {
