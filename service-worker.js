@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oreca-tools-v0.5.66';
+const CACHE_NAME = 'oreca-tools-v0.6.05';
 const CORE = [
   './',
   './index.html',
@@ -13,9 +13,11 @@ const CORE = [
   './kill/index.html',
   './kill/ui.js',
   './kill/engine.js',
+  './kill/old5-precomputed.js',
   './kill/presets.js',
   './kill/boss-presets.js',
   './kill/commands.js',
+  './kill/enemy-actions.js',
   './encounter/',
   './encounter/index.html',
   './encounter/ui.js',
@@ -26,6 +28,8 @@ const CORE = [
   './skill/index.html',
   './skill/ui.js',
   './skill/engine.js',
+  './mining/',
+  './mining/index.html',
   './manifest.webmanifest',
   './icons/icon-180.png',
   './icons/icon-192.png',

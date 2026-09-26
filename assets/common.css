@@ -432,6 +432,18 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px c
   font-weight: 700;
   opacity: .78;
 }
+.fixed-skill-display {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line, #d8dee8);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--panel) 94%, var(--accent) 6%);
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
 
 /* v0.5.13: 撃破確率 BOSSプリセット */
 .boss-preset-field { margin-bottom: 10px; }
@@ -448,3 +460,16 @@ input:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px c
 .boss-preset-info strong { font-size: 14px; }
 .boss-preset-info small { color: var(--muted); }
 .panel-note { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+
+/* v0.5.67: 最終ターンの任意行動者で計算を打ち切る */
+.final-turn-cutoff-box {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--accent-soft);
+}
+.final-turn-cutoff-box .mini-field { max-width: 360px; }
+.final-turn-cutoff-box .inline-note { margin: 0; color: var(--muted); line-height: 1.5; }

@@ -134,12 +134,14 @@ function threeTurnGodBarolo(protect) {
   assert.equal(mold.hpCarryPercent, 50);
   assert.equal(mold.attackCarryPercent, 50);
   assert.equal(enemyCompanionBaseHp('ゾンビビ'), 270);
+  assert.equal(enemyCompanionBaseHp('蛇竜のタマゴ'), 5);
+  assert.deepEqual(enemyCompanionProfile('蛇竜のタマゴ')?.matrix?.[0], Array(6).fill('ときをまつ'));
   assert.ok(enemyCompanionProfile('スライム'));
   assert.ok(enemyCompanionProfile('死神モート'));
   assert.ok(enemyCompanionProfile('アヴァドン'));
 
   // 登録済みBOSS/お供コマンドに、撃破率へ関係する「未解決名」を残さない。
-  const structural = name => /^(?:ミス|ほほえんでいる|ほほえんでいる…|ほほえんでいる\?|ためる|チャージ|様子を見ている|ときをまつ|笑っている|うなる|燃えている|なげいている|うつむいている|みくだしている)$/.test(name)
+  const structural = name => /^(?:ミス|ほほえんでいる|ほほえんでいる…|ほほえんでいる\?|ためる|チャージ|様子を見ている|ときをまつ|さむさにたえている|笑っている|うなる|燃えている|なげいている|うつむいている|みくだしている)$/.test(name)
     || /[★☆]+→[★☆]+/.test(name) || /^EXゲージ[+＋]\d+$/.test(name);
   const missing = [];
   for (const id of ENEMY_BOSS_PROFILE_IDS) {
@@ -261,7 +263,7 @@ process.exit(0);
   s.turns[0].allyActions[0] = { kind:'skip', skillName:'', effects:[] };
   s.turns[0].enemyAction = { enabled:true, effect:{ type:'statusCold', target:'all', activationChance:'100', chance:'100', duration:'3', attackType:'magic' } };
   s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
-  s.turns[1].allyActions[0] = { kind:'attack', skillName:'アクアブレス', skillMultiplier:'100', attackAttribute:'water', attackAttribute2:'none', attackType:'other', hits:'1', effects:[] };
+  s.turns[1].allyActions[0] = { kind:'attack', skillName:'アクアブレス', skillMultiplier:'100', attackAttribute:'water', attackAttribute2:'none', attackType:'breath', hits:'1', effects:[] };
   s.turns[1].enemyAction = { enabled:false, effect:{ type:'none' } };
   const r = simulateKillProbability(s);
   approx(r.killChance, 0, 1e-9);
@@ -594,7 +596,7 @@ process.exit(0);
   for (const id of ['old0_red_princess','old1_grim','old0_quicksilver','old0_heavy_behemoth','new1_fiska','new1_robo_03','new3_oroshi','new0_nergal','old2_soccerra','old2_ifrit','old5_kujeska','old3_fanlong','new0_volcano_dragon','new5_glacier_dragon','q_great_kujeska','q_great_muus','q_ice_dante','q_kenran_kukulkan','old4_chiviere','new3_deathfear_plant','new2_arp','new6_kais','new3_root_dragon','new6_elysion','new6_wight','new6_arc_dragon','q_michael']) {
     assert.ok(ENEMY_BOSS_PROFILE_IDS.includes(id), `missing v0.5.23 boss ${id}`);
   }
-  assert.deepEqual(ENEMY_COMPANION_PROFILE_NAMES, ['バロ','イシザル','カルラ','アシユラ','ピートー','ブリュー','魔海将フィスカ','イムホテプ','大地の闘士ロック','岩竜ロックドラゴン','スカルボーンドラゴン','ドーシュ','アヴァドンフード','ナンクルマル','魔鏡騎士リフレク','ダークサラマンダー','海竜のしずく','竜灰','マト','ベージ','グリ','吟遊詩人キドリ','猿石','古神兵サルベージ','フェンリル','ロボ零壱式','ロボ零弐式','魔海魚ブブリ','魔海兵ブリュー','参謀エンリル','僧兵オニワカ','ルートドラン','フランケンボーイ','ロボ弐式','デメラ','デスプラント','大樹竜の球根','カマエル','天戦士クレイ','アルラ','アルラウネ','金竜のタマゴ','火山弾','竜氷山']);
+  assert.deepEqual(ENEMY_COMPANION_PROFILE_NAMES, ['バロ','イシザル','カルラ','アシユラ','ピートー','ブリュー','魔海将フィスカ','イムホテプ','大地の闘士ロック','岩竜ロックドラゴン','スカルボーンドラゴン','ドーシュ','アヴァドンフード','ナンクルマル','魔鏡騎士リフレク','ダークサラマンダー','海竜のしずく','竜灰','マト','ベージ','グリ','吟遊詩人キドリ','猿石','古神兵サルベージ','フェンリル','ロボ零壱式','ロボ零弐式','魔海魚ブブリ','魔海兵ブリュー','参謀エンリル','僧兵オニワカ','ルートドラン','フランケンボーイ','ロボ弐式','デメラ','デスプラント','大樹竜の球根','カマエル','天戦士クレイ','アルラ','アルラウネ','ヤマタマゴ','鳥竜のタマゴ','金竜のタマゴ','火山弾','竜氷山']);
   for (const name of ENEMY_COMPANION_PROFILE_NAMES) {
     const cp = enemyCompanionProfile(name);
     assert.ok(cp, `missing companion ${name}`);
@@ -1460,7 +1462,7 @@ function oneTurnGreatKujeska(attribute) {
   }
 }
 
-// 77) v0.5.35: 斉天大聖ソンゴクウ／魔皇マオタイと猿石を登録。
+// 77) v0.5.94: 斉天大聖ソンゴクウ／魔皇マオタイを登録。猿石は敵お供ではない。
 {
   const { enemyBossProfile, enemyCommandTransitions, enemySkillForCommand, enemyCompanionProfile } = await import('../kill/enemy-actions.js');
   const { BOSS_PRESET_BY_ID } = await import('../kill/boss-presets.js');
@@ -1469,7 +1471,8 @@ function oneTurnGreatKujeska(attribute) {
   assert.equal(goku.attack, 60);
   assert.equal(goku.matrix.length, 6);
   for (let reel=0; reel<6; reel++) approx(enemyCommandTransitions('old7_son_goku', reel).reduce((sum,x)=>sum+x.probability,0), 1, 1e-9);
-  assert.deepEqual(BOSS_PRESET_BY_ID.get('old7_son_goku').companions, ['猿石']);
+  assert.deepEqual(BOSS_PRESET_BY_ID.get('old7_son_goku').companions, []);
+  assert.equal(BOSS_PRESET_BY_ID.get('old7_son_goku').inferCompanions, false);
   const stone = enemyCompanionProfile('猿石');
   assert.equal(stone.speed, 4);
   assert.equal(stone.attack, 4);
@@ -1604,7 +1607,7 @@ console.log('enemy-actions.test.js: OK v0.5.35');
 console.log('enemy-actions.test.js: OK v0.5.36');
 
 
-// 83) v0.5.37: 海竜ストリームドラゴン／灰竜アッシュドラゴンと固定お供2体を登録。
+// 83) 海竜ストリームドラゴンは単体BOSS、灰竜アッシュドラゴンは固定お供つき。
 {
   const { enemyBossProfile, enemyCommandTransitions, enemySkillForCommand, enemyCompanionProfile, ENEMY_BOSS_PROFILE_IDS, ENEMY_COMPANION_PROFILE_NAMES } = await import('../kill/enemy-actions.js');
   const { BOSS_PRESET_BY_ID } = await import('../kill/boss-presets.js');
@@ -1617,7 +1620,8 @@ console.log('enemy-actions.test.js: OK v0.5.36');
   assert.deepEqual(stream.matrix[0], ['ミス','こうげき','★→★★','こうげき!','★→★★','ウォーターブレス']);
   assert.deepEqual(stream.matrix[5], ['オプティカルカモフラージュ','ウォーターブレス','クリアアクアブレス','クリアアクアブレス','ストリームアタック','ストリームアタック']);
   for (let reel=0; reel<6; reel++) approx(enemyCommandTransitions('new1_stream_dragon', reel).reduce((sum,x)=>sum+x.probability,0), 1, 1e-9);
-  assert.deepEqual(BOSS_PRESET_BY_ID.get('new1_stream_dragon').companions, ['海竜のしずく']);
+  assert.deepEqual(BOSS_PRESET_BY_ID.get('new1_stream_dragon').companions, []);
+  assert.equal(BOSS_PRESET_BY_ID.get('new1_stream_dragon').inferCompanions, false);
   const droplet = enemyCompanionProfile('海竜のしずく');
   assert.equal(droplet.attack, 1);
   assert.equal(droplet.speed, 2);
@@ -2695,12 +2699,14 @@ for (const enemy of [
   assert.equal(mold.hpCarryPercent, 50);
   assert.equal(mold.attackCarryPercent, 50);
   assert.equal(enemyCompanionBaseHp('ゾンビビ'), 270);
+  assert.equal(enemyCompanionBaseHp('蛇竜のタマゴ'), 5);
+  assert.deepEqual(enemyCompanionProfile('蛇竜のタマゴ')?.matrix?.[0], Array(6).fill('ときをまつ'));
   assert.ok(enemyCompanionProfile('スライム'));
   assert.ok(enemyCompanionProfile('死神モート'));
   assert.ok(enemyCompanionProfile('アヴァドン'));
 
   // 登録済みBOSS/お供コマンドに、撃破率へ関係する「未解決名」を残さない。
-  const structural = name => /^(?:ミス|ほほえんでいる|ほほえんでいる…|ほほえんでいる\?|ためる|チャージ|様子を見ている|ときをまつ|笑っている|うなる|燃えている|なげいている|うつむいている|みくだしている)$/.test(name)
+  const structural = name => /^(?:ミス|ほほえんでいる|ほほえんでいる…|ほほえんでいる\?|ためる|チャージ|様子を見ている|ときをまつ|さむさにたえている|笑っている|うなる|燃えている|なげいている|うつむいている|みくだしている)$/.test(name)
     || /[★☆]+→[★☆]+/.test(name) || /^EXゲージ[+＋]\d+$/.test(name);
   const missing = [];
   for (const id of ENEMY_BOSS_PROFILE_IDS) {
@@ -2821,3 +2827,4 @@ for (const enemy of [
 
 console.log('enemy-actions.test.js: OK');
 process.exit(0);
+

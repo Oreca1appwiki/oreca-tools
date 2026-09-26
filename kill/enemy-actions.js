@@ -194,7 +194,7 @@ export const ENEMY_SKILLS = Object.freeze({
   'ソルティドッグ': skill('ソルティドッグ', { kind:'effect', target:'self', attackType:'magic', effects:[{ type:'summonCompanion', name:'フェンリル', startReel:2 }] }),
   '気合': skill('気合', { kind:'effect', target:'self', attackType:'other', effects:[{ type:'enemyAtkBuff', mode:'add', value:10, duration:99 }] }),
   'ほえる': skill('ほえる', { kind:'effect', target:'all', attackType:'other', effects:[{ type:'status', status:'paralysis', chance:60, duration:1 }] }),
-  'うなる': skill('うなる', { kind:'effect', target:'self', attackType:'other', effects:[{ type:'enemyAtkBuff', mode:'mult', value:150, duration:3 }] }),
+  'うなる': skill('うなる', { kind:'effect', target:'self', attackType:'other', effects:[{ type:'enemyAtkBuff', mode:'mult', value:150, duration:3, nonStacking:true, stackKey:'フェンリル:うなる' }] }),
   'まるかじり': skill('まるかじり', { kind:'attack', multiplier:200, target:'random', attackType:'physical', attributes:['none'] }),
 
   // ドラゴン系
@@ -203,12 +203,17 @@ export const ENEMY_SKILLS = Object.freeze({
   '暗黒のいき': skill('暗黒のいき', { kind:'attack', multiplier:125, target:'all', attackType:'breath', attributes:['dark'] }),
   '終焉のいき': skill('終焉のいき', { kind:'attack', multiplier:130, target:'all', attackType:'breath', attributes:['dark'], effects:[{ type:'status', status:'silence', chance:20, duration:3 }] }),
   'ポイズンブレス': skill('ポイズンブレス', { kind:'attack', multiplier:85, target:'all', attackType:'breath', attributes:['poison'], effects:[{ type:'status', status:'poison', chance:45, duration:99 }] }),
+  // 怒る蛇ムシュフシュ。毒は味方の行動・与ダメージに影響しないため撃破率では追跡しない。
+  'どくかみつき': skill('どくかみつき', { kind:'attack', multiplier:130, target:'random', attackType:'physical', attributes:['poison'] }),
+  'アシッドブレス': skill('アシッドブレス', { kind:'attack', multiplier:100, target:'all', attackType:'breath', attributes:['poison'] }),
+  'デスヴェノム': skill('デスヴェノム', { kind:'attack', multiplier:70, target:'all', attackType:'breath', attributes:['poison'] }),
   '石化ブレス': skill('石化ブレス', { kind:'attack', multiplier:110, target:'all', attackType:'breath', attributes:['earth'], effects:[{ type:'status', status:'petrification', chance:20, duration:99 }] }),
   '叢雲の尾': skill('叢雲の尾', { kind:'attack', multiplier:130, multiplierIfAnyHarmfulStatus:170, target:'all', attackType:'physical', attributes:['none'] }),
 
   'たいあたり': skill('たいあたり', { kind:'attack', multiplier:90, target:'all', attackType:'physical', attributes:['none'], effects:[{ type:'status', status:'paralysis', chance:15, duration:1 }] }),
   'ファイアーブレス': skill('ファイアーブレス', { kind:'attack', multiplier:105, target:'all', attackType:'breath', attributes:['fire'] }),
   '業火のいき': skill('業火のいき', { kind:'attack', multiplier:120, target:'all', attackType:'breath', attributes:['fire'] }),
+  'プロミネンス': skill('プロミネンス', { kind:'attack', multiplier:270, target:'random', attackType:'physical', attributes:['heat'] }),
   // v0.5.46: 煌竜王ファイアドレイク／滅竜王ブラックドレイク。
   // 爪は攻撃後に味方全体ATK+15（3ターン）。召喚お供の吸収回復量などにも波及するため敵チーム全体へ反映する。
   '雷光の爪': skill('雷光の爪', { kind:'attack', multiplier:210, target:'random', attackType:'physical', attributes:['light'], effects:[{ type:'enemyAtkBuff', mode:'add', value:15, duration:3, nonStacking:true, stackKey:'雷光の爪:攻撃', scope:'enemyTeam' }] }),
@@ -1038,6 +1043,17 @@ const BOSS_COMMAND_PROFILES = Object.freeze({
     ['アイスブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス']
   ]),
 
+  old0_mushufushu: profile(65, [
+    ['ほほえんでいる','ほほえんでいる','こうげき','どくかみつき','ためる','ためる'],
+    ['ほほえんでいる','こうげき','こうげき','どくかみつき','ためる','ためる'],
+    ['ほほえんでいる','こうげき','たいあたり','どくかみつき','ためる','ためる'],
+    ['こうげき','たいあたり','どくかみつき','どくかみつき','ためる','ためる'],
+    ['たいあたり','たいあたり','どくかみつき','どくかみつき','ためる','ためる'],
+    ['どくかみつき','アシッドブレス','アシッドブレス','アシッドブレス','ためる','ためる'],
+    ['ポイズンブレス','ポイズンブレス','ポイズンブレス','ポイズンブレス','ためる','ためる'],
+    Array(6).fill('デスヴェノム')
+  ]),
+
   old0_silver_dragon: profile(75, [
     ['こうげき','たいあたり','たいあたり','たいあたり','ためる','ためる'],
     ['こうげき','たいあたり','たいあたり','たいあたり','ためる','ためる'],
@@ -1076,6 +1092,16 @@ const BOSS_COMMAND_PROFILES = Object.freeze({
     ['ブリザードブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス','★★★★→★★★★★','ブリザードブレス'],
     ['ブリザードブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス','★★★★★→★★★★★★','ブリザードブレス'],
     ['ブリザードブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス','ブリザードブレス']
+  ]),
+
+  old4_salamander: profile(65, [
+    ['燃えている','こうげき','こうげき','こうげき!','★→★★','ファイアーブレス'],
+    ['燃えている','こうげき!','こうげき!','こうげき!','★★→★★★','ファイアーブレス'],
+    ['こうげき','こうげき!','こうげき!','ファイアーブレス','★★★→★★★★','業火のいき'],
+    ['こうげき!','こうげき!','ファイアーブレス','ファイアーブレス','★★★★→★★★★★','業火のいき'],
+    ['こうげき!','ファイアーブレス','ファイアーブレス','業火のいき','★★★★★→★★★★★★','プロミネンス'],
+    ['ファイアーブレス','ファイアーブレス','業火のいき','業火のいき','★★★★★★→★★★★★★★','プロミネンス'],
+    ['ファイアーブレス','業火のいき','業火のいき','プロミネンス','プロミネンス','プロミネンス']
   ]),
 
   old4_chibimuus: profile(45, [
@@ -1154,6 +1180,24 @@ const BOSS_COMMAND_PROFILES = Object.freeze({
     ['終焉のいき','終焉のいき','終焉のいき','終焉のいき','終焉のいき','終焉のいき']
   ], {
     '終焉のいき': skill('終焉のいき', { kind:'attack', multiplier:130, target:'all', attackType:'breath', attributes:['dark'], effects:[{ type:'status', status:'silence', chance:20, duration:3 }] })
+  }),
+
+  old2_rock_dragon: profile(55, [
+    ['ミス','ためる','ためる','ためる','こうげき!','こうげき!'],
+    ['ミス','ためる','ためる','ためる','おしつぶし','岩落とし'],
+    ['竜の咆哮','ためる','ためる','ためる','岩落とし','岩落とし'],
+    ['おしつぶし','ためる','ためる','ためる','ロックブレス','ロックブレス'],
+    ['岩落とし','ためる','ためる','ためる','竜の咆哮','竜の咆哮'],
+    ['竜の咆哮','岩落とし','岩落とし','ロックブレス','ロックブレス','ロックブレス']
+  ], {
+    '岩落とし': skill('岩落とし', { kind:'attack', multiplier:240, target:'random', attackType:'physical', attributes:['earth'] }),
+    '竜の咆哮': skill('竜の咆哮', { kind:'effect', target:'all', attackType:'other', effects:[
+      { type:'status', status:'paralysis', chance:30, duration:1 },
+      { type:'status', status:'confusion', chance:30, duration:1 }
+    ] }),
+    'ロックブレス': skill('ロックブレス', { kind:'attack', multiplier:150, target:'all', attackType:'breath', attributes:['earth'], effects:[
+      { type:'status', status:'petrification', chance:12, duration:99, target:'damaged' }
+    ] })
   }),
 
   old2_soccerra: profile(80, [
@@ -1859,6 +1903,25 @@ const BOSS_COMMAND_PROFILES = Object.freeze({
 });
 
 const COMPANION_COMMAND_PROFILES = Object.freeze({
+  // v0.5.93: 第6章の固定お供。Lv1最低表示値・入手時初期コマンドを基準。
+  '白竜のタマゴ': Object.freeze({ attribute:'water', race:'dragon', speed:1, attack:1, matrix:Object.freeze([
+    Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])
+  ]) }),
+  'デュラ': Object.freeze({ attribute:'fire', race:'undead', speed:25, attack:33, matrix:Object.freeze([
+    Object.freeze(['ミス','こうげき','こうげき!','こうげき!','★→★★','ヒートウェイブ']),
+    Object.freeze(['こうげき','こうげき!','こうげき!','ヒートウェイブ','くびかりのほうしゅう','くびかりのほうしゅう'])
+  ]), skills:Object.freeze({
+    'ヒートウェイブ': skill('ヒートウェイブ', { kind:'attack', multiplier:100, target:'all', attackType:'physical', attributes:['heat'] }),
+    // 撃破時EX+4は味方HPを追跡しない現行撃破率モデルでは判定不能。攻撃行動としてのみ保持する。
+    'くびかりのほうしゅう': skill('くびかりのほうしゅう', { kind:'attack', multiplier:170, target:'random', attackType:'physical', attributes:['dark'] })
+  }) }),
+  // v0.5.93: 獄王閻魔の固定お供。Lv1最低表示値・初期コマンドを基準。
+  'シャックル': Object.freeze({ attribute:'fire', race:'demon', speed:4, attack:38, matrix:Object.freeze([
+    Object.freeze(['ミス','こうげき','こうげき','かみつき','かみつき','拘束'])
+  ]), skills:Object.freeze({
+    'かみつき': skill('かみつき', { kind:'attack', multiplier:120, target:'random', attackType:'physical', attributes:['none'] }),
+    '拘束': ENEMY_SKILLS['拘束']
+  }) }),
   // v0.5.50: 創造神ロケーシャの固定お供／召喚先。ステータスはLv1最低表示値。
   // バロ・イシザル・アシユラは撃破率に影響する補助・状態異常を持たないため、純粋ダメージ行動を省略する高速経路を使う。
   'バロ': Object.freeze({ attribute:'fire', speed:29, attack:38, killProbabilityInert:true, matrix:Object.freeze([
@@ -1871,6 +1934,19 @@ const COMPANION_COMMAND_PROFILES = Object.freeze({
   // v0.5.64: 進化後の継承欄はユーザー指定により、進化元の入手時初期リールを基準にする。
   // カルラ1・2リール = 進化元カラステングの初期1・2リール。
   // カラステング1リールも継承欄なので、さらに進化元カラスの入手時初期リールを基準にする。
+  // v0.5.85: 魔皇クジェスカの固定お供。CPU個体のコマンド構成はランダムのため近似。
+  // ユーザー指定の継承ルールに従い、下位2リールは進化元・人魚セイレンの入手時初期コマンドを使用。
+  // 3リール目は魔人魚セイレンの初期コマンド表。ステータスはLv1最低表示値。
+  '魔人魚セイレン': Object.freeze({ attribute:'water', race:'aquatic', speed:63, attack:50, inheritedBaseline:true, matrix:Object.freeze([
+    Object.freeze(['アクア','アクア','アクア','アクア!','アクア!','★→★★']),
+    Object.freeze(['アクア','アクア!','アクア!','アクア!!','ゆうわく','ゆうわく']),
+    Object.freeze(['ゆうわく','アクア','アクア!','アクア!!','アクア!!!','セイレンの歌'])
+  ]), skills:Object.freeze({
+    'ゆうわく': skill('ゆうわく', { kind:'effect', target:'random', attackType:'magic', effects:[{ type:'status', status:'confusion', chance:75, duration:1 }] }),
+    // 継続歌の厳密なターン終了発火は固定お供近似の範囲外。発動時の初期眠り10%だけを追跡する。
+    'セイレンの歌': skill('セイレンの歌', { kind:'effect', target:'all', attackType:'magic', effects:[{ type:'status', status:'sleep', chance:10, duration:5 }] })
+  }) }),
+
   'カルラ': Object.freeze({ attribute:'wind', speed:50, attack:46, inheritedBaseline:true, matrix:Object.freeze([
     Object.freeze(['笑っている','笑っている','こうげき','こうげき','こうげき','黒い旋風']),
     Object.freeze(['笑っている','こうげき','こうげき!','大喝','テングツブテ','テングツブテ']),
@@ -1952,6 +2028,10 @@ const COMPANION_COMMAND_PROFILES = Object.freeze({
   'ドーシュ': Object.freeze({ attribute:'wind', race:'warrior', speed:16, attack:50, matrix:Object.freeze([
     Object.freeze(['ミス','こうげき','こうげき!','★→★★','狙い撃ち','フェザーキラー']),
     Object.freeze(['こうげき','こうげき','こうげき!','会心の一撃','フェザーキラー','フェザーキラー'])
+  ]) }),
+  // v0.6.00: (BOSS)黒鉄竜アイアンドラゴンの固定お供。Lv1最低表示値・初期コマンド。
+  '鉄のタマゴ': Object.freeze({ attribute:'fire', race:'dragon', speed:1, attack:1, matrix:Object.freeze([
+    Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])
   ]) }),
   // v0.5.40: (BOSS)魔王アヴァドンの固定お供／召喚先。Lv1最低表示値と初期コマンド。
   'アヴァドンフード': Object.freeze({ speed:29, attack:4, matrix:Object.freeze([
@@ -2195,11 +2275,14 @@ const COMPANION_COMMAND_PROFILES = Object.freeze({
       ]
     }] })
   }) }),
-  '参謀エンリル': Object.freeze({ speed:59, attack:50, matrix:Object.freeze([
-    Object.freeze(['ウィンド','ウィンド','ウィンド!','★→★★','ウィンド!','ミラージュ']),
-    Object.freeze(['ウィンド','ウィンド!','ウィンド!','★★→★★★','ウィンド!!','ミラージュ']),
-    Object.freeze(['ミラージュ','ウィンド!','ウィンド!!','★★★→★★★★','ウィンド!!','補給命令']),
-    Object.freeze(['ミラージュ','ウィンド!','ウィンド!','ウィンド!!!','ウィンド!!!','特配'])
+  // v0.5.95: (BOSS)覇将ネルガル戦の固定相方。通常個体ではなくBOSS版パラメータ／コマンドを使用。
+  '参謀エンリル': Object.freeze({ attribute:'wind', race:'normal', speed:60, attack:50, matrix:Object.freeze([
+    Object.freeze(['★→★★','★→★★','ミラージュ','ミラージュ','ウィンド!','ミス']),
+    Object.freeze(['ミラージュ','★★→★★★','★★→★★★','ウィンド!!','ミス','ウィンド!']),
+    Object.freeze(['★★★→★★★★','ミス','ミス','補給命令','ミス','★★★→★★★★']),
+    Object.freeze(['ミラージュ','ウィンド!!','ウィンド!!','★★★★→★★★★★','★★★★→★★★★★','ミラージュ']),
+    Object.freeze(['ウィンド!!','ウィンド!!!','ミス','ウィンド!!!','★★★★★→★★★★★★','★★★★★→★★★★★★']),
+    Object.freeze(['補給命令','ウィンド!!!','ウィンド!!!','ウィンド!!!','ウィンド!!!','ミラージュ'])
   ]) }),
   '僧兵オニワカ': Object.freeze({ speed:38, attack:50, matrix:Object.freeze([
     // 1・2リールは進化元オニワカの入手時初期コマンドを継承基準とする。
@@ -2262,9 +2345,42 @@ const COMPANION_COMMAND_PROFILES = Object.freeze({
   ]), inheritedBaseline:true }),
 
   // v0.5.24: BOSS固定編成のタマゴ系。初期コマンドは全枠【ときをまつ】。
-  '金竜のタマゴ': Object.freeze({ speed:0, attack:4, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  '岩竜のタマゴ': Object.freeze({ speed:1, attack:4, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  '蛇竜のタマゴ': Object.freeze({ speed:1, attack:1, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  // v0.5.83: 旧3章BOSS固定お供。Wiki初期コマンド・Lv1最低値を反映。
+  'ヤマタマゴ': Object.freeze({ attribute:'earth', race:'dragon', speed:0, attack:1, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  '鳥竜のタマゴ': Object.freeze({ attribute:'wind', race:'dragon', speed:2, attack:1, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  '金竜のタマゴ': Object.freeze({ killProbabilityInert:true, speed:0, attack:4, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  '炎竜のタマゴ': Object.freeze({ attribute:'fire', race:'dragon', speed:4, attack:4, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  '凍竜のタマゴ': Object.freeze({ attribute:'water', race:'dragon', speed:1, attack:1, matrix:Object.freeze([Object.freeze(['さむさにたえている','さむさにたえている','さむさにたえている','さむさにたえている','さむさにたえている','さむさにたえている'])]) }),
   '火山弾': Object.freeze({ speed:1, attack:1, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
-  '竜氷山': Object.freeze({ speed:1, attack:2, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) })
+  '竜氷山': Object.freeze({ speed:1, attack:2, matrix:Object.freeze([Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])]) }),
+  // v0.6.03: 新6章BOSS固定お供。Lv1最低値・初期コマンドをWiki仕様で登録。
+  '鬼竜骨': Object.freeze({ attribute:'earth', race:'undead', speed:1, attack:1, matrix:Object.freeze([
+    Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])
+  ]) }),
+  '聖なるタマゴ': Object.freeze({ attribute:'earth', race:'dragon', speed:2, attack:1, matrix:Object.freeze([
+    Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])
+  ]) }),
+
+  // v0.6.02: 新5章BOSS固定お供。Lv1最低値・初期コマンドをWiki仕様で登録。
+  '深海タマゴ': Object.freeze({ attribute:'water', race:'normal', speed:2, attack:1, matrix:Object.freeze([
+    Object.freeze(['ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ','ときをまつ'])
+  ]) }),
+  '巫女ラムーネ': Object.freeze({ attribute:'water', race:'summoner', speed:59, attack:46, matrix:Object.freeze([
+    Object.freeze(['ミス','ミス','アクア!','アクア!','★→★★','血の呪い']),
+    Object.freeze(['ミス','アクア!','アクア!','アクアヴィータ','★★→★★★','禁忌の召喚術★★★']),
+    Object.freeze(['ミス','アクア!','アクア!','アクア!','血の呪い','禁忌の召喚術★★★★'])
+  ]), skills:Object.freeze({
+    // 水属性か水族なら110、両方なら150。対象は敵チーム内の生存1体をCPUランダム選択。
+    'アクアヴィータ': skill('アクアヴィータ', { kind:'companionAquaVita', target:'enemySingle', attackType:'magic', healNormal:70, healWaterOrAquatic:110, healWaterAquatic:150 }),
+    // 自身へ攻撃120%の加護。既に加護中なら先に攻撃+5（永続・重複可）。
+    '血の呪い': skill('血の呪い', { kind:'companionSelfBlessing', target:'self', attackType:'other', value:120, attackGainIfBlessed:5 }),
+    // CPUラムーネの召喚先は★★★=ギョギョ、★★★★=カニクラブ。召喚個体はHP/ATK/SPD 1.2倍。
+    // Lv1最低表示値を基準に1.2倍後の整数値を明示する。
+    '禁忌の召喚術★★★': skill('禁忌の召喚術★★★', { kind:'companionHpCostSummon', target:'self', attackType:'magic', hpCost:70, summon:{ name:'ギョギョ', maxHp:182, attack:50, speed:80, attribute:'water', race:'aquatic', startReel:2 } }),
+    '禁忌の召喚術★★★★': skill('禁忌の召喚術★★★★', { kind:'companionHpCostSummon', target:'self', attackType:'magic', hpCost:90, summon:{ name:'カニクラブ', maxHp:264, attack:60, speed:60, attribute:'water', race:'aquatic', startReel:3 } })
+  }) })
 });
 
 // v0.5.54: BOSS固定お供／召喚お供のHP。CPU固定個体を個体値まで特定できないものは、
@@ -2275,6 +2391,7 @@ const COMPANION_BASE_HP = Object.freeze({
   '火竜のタマゴ':4,
   '太竜のタマゴ':7,
   '水竜のタマゴ':3,
+  '蛇竜のタマゴ':5,
   'デメラ':77,
   'スライム':8,
   'グリ':37,
@@ -2284,20 +2401,24 @@ const COMPANION_BASE_HP = Object.freeze({
   '氷結精':5,
   '黒竜のタマゴ':8,
   'ベージ':67,
+  '岩竜のタマゴ':8,
   '竜のズコツ':4,
   'ヤマタマゴ':12,
   '鳥竜のタマゴ':4,
   '金竜のタマゴ':8,
+  '炎竜のタマゴ':4,
   '魔王のトリタマゴ':1,
   '凍竜のタマゴ':5,
+  '魔人魚セイレン':135,
   '白竜のタマゴ':5,
+  'シャックル':59,
   'ゾンビ':135,
   'ゾンビビ':270,
   'デュラ':118,
   '猿石':76,
   '火山弾':12,
   'マト':76,
-  '参謀エンリル':186,
+  '参謀エンリル':650,
   '海竜のしずく':5,
   '魔海兵ブリュー':195,
   '魔海魚ブブリ':169,
@@ -2319,6 +2440,7 @@ const COMPANION_BASE_HP = Object.freeze({
   'マシュまろ':33,
   '竜氷山':8,
   '深海タマゴ':6,
+  '巫女ラムーネ':161,
   '鬼竜骨':15,
   '天戦士クレイ':93,
   'カマエル':84,
@@ -2347,13 +2469,24 @@ export function enemyCompanionProfile(name) {
   return COMPANION_COMMAND_PROFILES[String(name ?? '').trim()] ?? null;
 }
 
+
+const ENEMY_COMMAND_TRANSITIONS_CACHE = new Map();
+const COMPANION_COMMAND_TRANSITIONS_CACHE = new Map();
+
 export function enemyCompanionCommandTransitions(name, startReel = 0, commandOverrides = null, preserveSlots = false) {
   const companion = enemyCompanionProfile(name);
   if (!companion) return null;
   const overrides = commandOverrides && typeof commandOverrides === 'object' ? commandOverrides : null;
+  if (!overrides) {
+    const cacheKey = `${name}|${Number(startReel) || 0}|${preserveSlots ? 1 : 0}`;
+    if (COMPANION_COMMAND_TRANSITIONS_CACHE.has(cacheKey)) return COMPANION_COMMAND_TRANSITIONS_CACHE.get(cacheKey);
+    const value = commandTransitionsFromMatrix(companion.matrix, startReel, { preserveSlots });
+    COMPANION_COMMAND_TRANSITIONS_CACHE.set(cacheKey, value);
+    return value;
+  }
   const matrix = companion.matrix.map((row, reel) => row.map((command, slotIndex) => {
     const key = `${reel}:${slotIndex}`;
-    return overrides && Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : command;
+    return Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : command;
   }));
   return commandTransitionsFromMatrix(matrix, startReel, { preserveSlots });
 }
@@ -2373,8 +2506,16 @@ export function enemyBossProfile(presetId) {
 export function enemyCommandTransitions(presetId, startReel = 0, disabledCommands = [], commandOverrides = null, preserveSlots = false) {
   const boss = enemyBossProfile(presetId);
   if (!boss) return null;
-  const disabled = new Set((disabledCommands ?? []).map(x => String(x ?? '').trim()).filter(Boolean));
+  const disabledList = (disabledCommands ?? []).map(x => String(x ?? '').trim()).filter(Boolean);
   const overrides = commandOverrides && typeof commandOverrides === 'object' ? commandOverrides : null;
+  if (!disabledList.length && !overrides) {
+    const cacheKey = `${presetId}|${Number(startReel) || 0}|${preserveSlots ? 1 : 0}`;
+    if (ENEMY_COMMAND_TRANSITIONS_CACHE.has(cacheKey)) return ENEMY_COMMAND_TRANSITIONS_CACHE.get(cacheKey);
+    const value = commandTransitionsFromMatrix(boss.matrix, startReel, { preserveSlots });
+    ENEMY_COMMAND_TRANSITIONS_CACHE.set(cacheKey, value);
+    return value;
+  }
+  const disabled = new Set(disabledList);
   const matrix = boss.matrix.map((row, reel) => row.map((command, slotIndex) => {
     const key = `${reel}:${slotIndex}`;
     const overridden = overrides && Object.prototype.hasOwnProperty.call(overrides, key) ? overrides[key] : command;

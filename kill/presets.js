@@ -8,13 +8,15 @@ const attack = (id, name, {
   multiplierMin = '', multiplierMax = '', multiplierStep = '', hitsMin = '', hitsMax = '',
   undeadSkillMultiplier = '', poisonedSkillMultiplier = '', deadlyPoisonSkillMultiplier = '',
   weakDefenderAttribute = '', weakSkillMultiplier = '', raceSkillMultipliers = {}, damageFormula = '',
-  effects = [], note = '', selectable = true, selfDestruct = false, enemyTarget = 'single'
+  effects = [], note = '', selectable = true, selfDestruct = false, enemyTarget = 'single',
+  playerExRequired = 0, playerExSpend = 0
 } = {}) => ({
   id, name, kind: 'attack', skillName: name, skillMultiplier: multiplier,
   attackAttribute: attribute, attackAttribute2: attribute2, attackType, hits,
   skillMultiplierMin: multiplierMin, skillMultiplierMax: multiplierMax, skillMultiplierStep: multiplierStep,
   hitsMin, hitsMax, undeadSkillMultiplier, poisonedSkillMultiplier, deadlyPoisonSkillMultiplier,
-  weakDefenderAttribute, weakSkillMultiplier, raceSkillMultipliers, damageFormula, effects, note, selectable, selfDestruct, enemyTarget
+  weakDefenderAttribute, weakSkillMultiplier, raceSkillMultipliers, damageFormula, effects, note, selectable, selfDestruct, enemyTarget,
+  playerExRequired, playerExSpend
 });
 
 const buff = (id, name, buffData, effects = [], note = '', selectable = true) => ({
@@ -59,6 +61,18 @@ export const SKILL_PRESETS = Object.freeze([
     { type: 'statusCure', target: 'all' },
     { type: 'statusImmune', target: 'all', duration: '2' }
   ], '味方全体の状態異常を治療し、2ターンの間、状態異常を無効化します。'), 'buff'),
+  major(effectOnly('ex_plus_8', 'EXゲージ+8', [],
+    '七十二変化の術の変化先として使用。停止コマンドのEXゲージ+8は共有EXへ自動加算されます。'), 'buff'),
+  { ...effectOnly('lava_boost', 'ラヴァブースト', [],
+    '発動ターンは溜め、次の自身の行動機会に熱属性500%単体魔法を自動発動します。敵から100ダメージ以上を受けた際の溜め解除は、敵の純粋ダメージを扱わない現行モデルでは未反映です。', false), chargeSkillPresetId:'lava_boost_release' },
+  attack('lava_boost_release', 'ラヴァブースト（発動）', {
+    multiplier:'500', attribute:'heat', attackType:'magic', enemyTarget:'single', selectable:false,
+    note:'ラヴァブーストの次行動時に自動発動する内部技。'
+  }),
+  attack('lava', 'ラヴァ', {
+    multiplier:'50', attribute:'heat', attackType:'magic', enemyTarget:'single', selectable:false,
+    note:'マジシャン／レッド・マジシャン用。Wiki攻撃技一覧の倍率50%。'
+  }),
   major(buff('item_parts', 'アイテムパーツ',
     { type: 'atkBuff', target: 'self', mode: 'add', value: '25', duration: '3' },
     [{ type: 'speedBuff', target: 'self', mode: 'add', value: '60', duration: '3' }],
@@ -73,15 +87,15 @@ export const SKILL_PRESETS = Object.freeze([
   // 攻撃技：忍法 〇〇の術
   major(attack('ninja_wind', '忍法 風迅の術', {
     multiplier: '80', multiplierMin: '70', multiplierMax: '90', multiplierStep: '0.1',
-    attribute: 'wind', attackType: 'magic', hits: '3'
+    attribute: 'wind', attackType: 'magic', hits: '3', enemyTarget: 'random'
   }), 'attack'),
   major(attack('ninja_fire', '忍法 鬼火の術', {
     multiplier: '80', multiplierMin: '70', multiplierMax: '90', multiplierStep: '0.1',
-    attribute: 'fire', attackType: 'magic', hits: '3'
+    attribute: 'fire', attackType: 'magic', hits: '3', enemyTarget: 'random'
   }), 'attack'),
   major(attack('ninja_water', '忍法 蛇水の術', {
     multiplier: '80', multiplierMin: '70', multiplierMax: '90', multiplierStep: '0.1',
-    attribute: 'water', attackType: 'magic', hits: '3'
+    attribute: 'water', attackType: 'magic', hits: '3', enemyTarget: 'random'
   }), 'attack'),
 
   // 攻撃技：〇〇ポイント。EXゲージ量別に実用値を分けて選択できるようにする。
@@ -91,12 +105,12 @@ export const SKILL_PRESETS = Object.freeze([
   major(attack('green_point_2', 'グリーンポイント', { multiplier: '250', attribute: 'wind', attackType: 'physical' }), 'attack'),
 
   major(attack('crush', 'おしつぶし', {
-    multiplier: '65', attribute: 'earth', attackType: 'physical', hits: '4',
+    multiplier: '65', attribute: 'earth', attackType: 'physical', hits: '4', enemyTarget: 'random',
     effects: [{ type: 'enemyParalysis', chance: '15' }],
     note: '15%で麻痺。次の敵行動を1回失って解除する確率枝を反映します。'
   }), 'attack'),
   major(attack('peck_many', 'つつきまくり', {
-    multiplier: '70', attribute: 'wind', attackType: 'physical', hits: '3'
+    multiplier: '70', attribute: 'wind', attackType: 'physical', hits: '3', enemyTarget: 'random'
   }), 'attack'),
   major(attack('windmill', '風車', {
     multiplier: '100', attribute: 'wind', attackType: 'physical', hits: '1', damageFormula: 'windmill',
@@ -112,25 +126,25 @@ export const SKILL_PRESETS = Object.freeze([
 
   major(attack('fire_torture', '火責め', { multiplier: '165', attribute: 'fire', attackType: 'magic' }), 'attack'),
   major(attack('water_torture', '水責め', { multiplier: '165', attribute: 'water', attackType: 'magic' }), 'attack'),
-  major(attack('wet_slicer', 'ウェットスライサー', { multiplier: '50', attribute: 'water', attackType: 'physical', hits: '4' }), 'attack'),
+  major(attack('wet_slicer', 'ウェットスライサー', { multiplier: '50', attribute: 'water', attackType: 'physical', hits: '4', enemyTarget: 'random' }), 'attack'),
   major(attack('red_fire_breath', 'レッドファイアブレス', {
-    multiplier: '90', attribute: 'fire', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'water', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'fire', attackType: 'breath', enemyTarget: 'all', weakDefenderAttribute: 'water', weakSkillMultiplier: '150',
     note: '通常90%。水属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('blue_aqua_breath', 'ブルーアクアブレス', {
-    multiplier: '90', attribute: 'water', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'earth', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'water', attackType: 'breath', enemyTarget: 'all', weakDefenderAttribute: 'earth', weakSkillMultiplier: '150',
     note: '通常90%。土属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('yellow_earth_breath', 'イエローアースブレス', {
-    multiplier: '90', attribute: 'earth', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'wind', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'earth', attackType: 'breath', enemyTarget: 'all', weakDefenderAttribute: 'wind', weakSkillMultiplier: '150',
     note: '通常90%。風属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('green_air_breath', 'グリーンエアブレス', {
-    multiplier: '90', attribute: 'wind', attackType: 'other', enemyTarget: 'all', weakDefenderAttribute: 'fire', weakSkillMultiplier: '150',
+    multiplier: '90', attribute: 'wind', attackType: 'breath', enemyTarget: 'all', weakDefenderAttribute: 'fire', weakSkillMultiplier: '150',
     note: '通常90%。火属性への特効時は技倍率150%として計算します。'
   }), 'attack'),
   major(attack('roaring_lightning', '轟く稲妻', {
-    multiplier: '80', attribute: 'thunder', attackType: 'physical', hits: '4', hitsMin: '3', hitsMax: '5',
+    multiplier: '80', attribute: 'thunder', attackType: 'physical', hits: '4', hitsMin: '3', hitsMax: '5', enemyTarget: 'random',
     effects: [{ type: 'enemyParalysis', chance: '45' }],
     note: '45%で麻痺。ヒット数によらず攻撃行動単位で1回判定します。'
   }), 'attack'),
@@ -140,15 +154,15 @@ export const SKILL_PRESETS = Object.freeze([
     note: '通常180%。天使・鳥獣には90%。'
   }), 'attack'),
   major(attack('poison_crush', 'どくつぶし', {
-    multiplier: '80', poisonedSkillMultiplier: '105', attribute: 'poison', attackType: 'physical', hits: '3',
+    multiplier: '80', poisonedSkillMultiplier: '105', attribute: 'poison', attackType: 'physical', hits: '3', enemyTarget: 'random',
     effects: [{ type: 'poison', chance: '20' }],
     note: '敵が毒・猛毒なら1発105%。攻撃後20%で毒を付与します。'
   }), 'attack'),
   major(attack('kamaitachi', 'カマイタチ', {
-    multiplier: '50', attribute: 'wind', attackType: 'magic', hits: '4', hitsMin: '3', hitsMax: '6'
+    multiplier: '50', attribute: 'wind', attackType: 'magic', hits: '4', hitsMin: '3', hitsMax: '6', enemyTarget: 'random'
   }), 'attack'),
   major(attack('tatsumaki', 'タツマキ', {
-    multiplier: '70', attribute: 'wind', attackType: 'magic', hits: '4', hitsMin: '3', hitsMax: '6'
+    multiplier: '70', attribute: 'wind', attackType: 'magic', hits: '4', hitsMin: '3', hitsMax: '6', enemyTarget: 'random'
   }), 'attack'),
   major(attack('dark_fire', 'ダークファイア', { multiplier: '250', attribute: 'fire', attribute2: 'dark', attackType: 'magic' }), 'attack'),
   major(attack('rain_god_spear', '雨神の戟', { multiplier: '230', attribute: 'water', attackType: 'physical' }), 'attack'),
@@ -171,28 +185,38 @@ export const SKILL_PRESETS = Object.freeze([
     multiplier: '200', attribute: 'none', attackType: 'physical', selfDestruct: true, enemyTarget: 'all',
     note: '攻撃後、使用者は戦闘から離脱します。'
   }), 'attack'),
-  major(attack('ikazuchi', 'イカズチ', { multiplier: '140', attribute: 'thunder', attackType: 'magic' }), 'attack'),
+  major(attack('ikazuchi', 'イカズチ', { multiplier: '140', attribute: 'thunder', attackType: 'magic', enemyTarget: 'all' }), 'attack'),
   major(attack('venom_salamanda', 'ヴェノム・サラマンダ', {
-    multiplier: '135', attribute: 'fire', attribute2: 'poison', attackType: 'magic',
+    multiplier: '135', attribute: 'fire', attribute2: 'poison', attackType: 'magic', enemyTarget: 'all',
     effects: [{ type: 'poison', chance: '40' }],
     note: '攻撃後40%で毒を付与します。'
   }), 'attack'),
-  major(attack('fire_ice_breath2', '炎と氷のいき!!', { multiplier: '300', attribute: 'all', attackType: 'other', enemyTarget: 'all' }), 'attack'),
+  major(attack('fire_ice_breath2', '炎と氷のいき!!', { multiplier: '300', attribute: 'all', attackType: 'breath', enemyTarget: 'all' }), 'attack'),
   major(attack('shout', 'さけぶ', {
-    multiplier: '10', attribute: 'none', attackType: 'magic',
+    multiplier: '10', attribute: 'none', attackType: 'magic', enemyTarget: 'random',
     effects: [{ type: 'enemyParalysis', chance: '80' }],
     note: '80%で麻痺。次の敵行動を1回失って解除します。'
   }), 'attack'),
   major(attack('headwind', 'むかい風', {
-    multiplier: '90', attribute: 'wind', attackType: 'magic',
+    multiplier: '90', attribute: 'wind', attackType: 'magic', enemyTarget: 'all',
     effects: [{ type: 'speedDown', mode: 'mult', value: '50', duration: '2' }],
     note: '倍率90%の全体魔法。敵の素早さ半減（2ターン、重ね掛け可）を反映。'
   }), 'attack'),
 
   major(attack('bubble_grand', 'シャボン・グラン', { multiplier: '150', attribute: 'water', attackType: 'magic' }), 'attack'),
-  major(attack('rengeki', '連撃', { multiplier: '115', attribute: 'none', attackType: 'physical', hits: '2' }), 'attack'),
+  major(attack('rengeki', '連撃', { multiplier: '115', attribute: 'none', attackType: 'physical', hits: '2', enemyTarget: 'random' }), 'attack'),
+  major(attack('trial_gun', '試作魔銃', {
+    multiplier: '300', attribute: 'none', attackType: 'physical', damageFormula: 'trial_gun',
+    note: '倍率=300×対象の残HP割合。HP1を残して撃破できず、対象がHP1なら不発。'
+  }), 'attack'),
+  major(attack('goku_lower_ex', '身外身の術', {
+    multiplier: '55', multiplierMin: '10', multiplierMax: '100', multiplierStep: '1',
+    attribute: 'wind', attackType: 'magic', hits: '10', enemyTarget: 'random',
+    playerExRequired: 10, playerExSpend: 10,
+    note: '斉天大聖ソンゴクウ下位EX。共有EX10を消費し、1ヒットごとに10〜100%を等確率で抽選する10回拡散攻撃。'
+  }), 'attack'),
   major(attack('heat_wave', 'ヒートウェイブ', { multiplier: '90', attribute: 'fire', attackType: 'physical', enemyTarget: 'all' }), 'attack'),
-  major(attack('ice_storm_strike', '氷嵐撃', { multiplier: '140', attribute: 'wind', attribute2: 'ice', attackType: 'physical' }), 'attack'),
+  major(attack('ice_storm_strike', '氷嵐撃', { multiplier: '140', attribute: 'wind', attribute2: 'ice', attackType: 'physical', enemyTarget: 'random' }), 'attack'),
 
   // その他：この撃破確率ツールで敵HPに直接影響しない効果は、選択肢として保持して注記する。
 
@@ -205,17 +229,17 @@ export const SKILL_PRESETS = Object.freeze([
     multiplier: '140', attribute: 'poison', attackType: 'physical', effects: [{ type: 'poison' }]
   }), 'attack'),
   major(attack('melting_breath', 'とけるいき', {
-    multiplier: '60', deadlyPoisonSkillMultiplier: '120', attribute: 'poison', attribute2: 'dark', attackType: 'other',
+    multiplier: '60', deadlyPoisonSkillMultiplier: '120', attribute: 'poison', attribute2: 'dark', attackType: 'breath', enemyTarget: 'all',
     effects: [{ type: 'poisonToDeadly' }], note: '敵が猛毒なら技倍率120%。毒なら攻撃後に猛毒化。'
   }), 'attack'),
-  major(effectOnly('epidemic_glass', '悪疫グラス', [{ type: 'poisonToDeadly' }], '撃破確率計算では毒→猛毒のみ反映。'), 'other'),
+  major({ ...effectOnly('epidemic_glass', '悪疫グラス', [{ type: 'poisonToDeadly' }], '撃破確率計算では毒→猛毒のみ反映。'), enemyTarget:'random' }, 'other'),
 
   // ---------------------------------------------------------------------------
   // モンスタープリセット由来の補助技。
   // 主要な周回技ではないが、キャラ選択時の自動入力名をそのまま表示できるよう「その他」に公開する。
   // ---------------------------------------------------------------------------
   major(attack('foot_sweep', '足ばらい', {
-    multiplier: '40', attribute: 'none', attackType: 'physical',
+    multiplier: '40', attribute: 'none', attackType: 'physical', enemyTarget: 'all',
     effects: [
       { type: 'defenseDown', mode: 'mult', value: '20', duration: '99', expiry: 'sourceNextActionStart' },
       { type: 'enemyParalysis', chance: '15' }
@@ -228,17 +252,20 @@ export const SKILL_PRESETS = Object.freeze([
     note: '30%で麻痺。次の敵行動を1回失って解除します。'
   }), 'other'),
   major(attack('attack_bang', 'こうげき！', { multiplier: '100', attribute: 'none', attackType: 'physical' }), 'other'),
+  major(attack('triple_attack', '3回こうげき', { multiplier: '50', attribute: 'none', attackType: 'physical', hits: '3', enemyTarget: 'random' }), 'other'),
   major(attack('dragon_tail', '竜のしっぽ', {
     multiplier: '90', attribute: 'none', attackType: 'physical', enemyTarget: 'all', effects: [{ type: 'poison', chance: '25' }],
     note: '毒25%。毒は撃破確率に影響するため確率分岐で反映します。'
   }), 'other'),
-  major(attack('aqua_breath', 'アクアブレス', { multiplier: '105', attribute: 'water', attackType: 'other', enemyTarget: 'all' }), 'other'),
-  major(attack('shining_breath', 'シャイニングブレス', { multiplier: '105', attribute: 'light', attackType: 'other', enemyTarget: 'all' }), 'other'),
+  major(attack('aqua_breath', 'アクアブレス', { multiplier: '105', attribute: 'water', attackType: 'breath', enemyTarget: 'all' }), 'other'),
+  major(attack('water_breath', 'ウォーターブレス', { multiplier: '105', attribute: 'water', attackType: 'breath', enemyTarget: 'all' }), 'other'),
+  major(attack('ice_breath', 'アイスブレス', { multiplier: '105', attribute: 'ice', attackType: 'breath', enemyTarget: 'all' }), 'other'),
+  major(attack('shining_breath', 'シャイニングブレス', { multiplier: '105', attribute: 'light', attackType: 'breath', enemyTarget: 'all' }), 'other'),
   major(attack('fire1', 'ファイア！', { multiplier: '100', attribute: 'fire', attackType: 'magic' }), 'other'),
   major(attack('ice1', 'アイス！', { multiplier: '100', attribute: 'ice', attackType: 'magic' }), 'other'),
   major(attack('thunder1', 'サンダー！', { multiplier: '100', attribute: 'thunder', attackType: 'magic' }), 'other'),
   major(attack('meteor', 'メテオ！', { multiplier: '160', attribute: 'all', attackType: 'magic' }), 'other'),
-  major(attack('purifying_flame', '浄化の炎', { multiplier: '50', undeadSkillMultiplier: '170', attribute: 'fire', attribute2: 'holy', attackType: 'magic' }), 'other'),
+  major(attack('purifying_flame', '浄化の炎', { multiplier: '50', undeadSkillMultiplier: '170', attribute: 'fire', attribute2: 'holy', attackType: 'magic', enemyTarget: 'all' }), 'other'),
   major(attack('shiden', '紫電', {
     multiplier: '100', attribute: 'thunder', attackType: 'physical',
     note: '納刀時100%、抜刀時200%。構え状態の自動追跡が未確定のため、最悪条件として100%を使用します。'
@@ -249,17 +276,19 @@ export const SKILL_PRESETS = Object.freeze([
   // ルーレット完全実行用の非表示プリセット。
   // UIの主要技一覧には出さず、登録コマンドで実際に止まった場合だけ使用する。
   attack('attack_plain', 'こうげき', { multiplier: '50', attribute: 'none', attackType: 'physical', selectable: false }),
-  attack('petit_ice_storm', 'プチ・アイスストーム', { multiplier: '85', attribute: 'ice', attackType: 'magic', selectable: false }),
-  attack('flutter', 'はばたき', { multiplier: '50', attribute: 'wind', attackType: 'physical', selectable: false }),
-  attack('clear_aqua_breath', 'クリアアクアブレス', { multiplier: '145', attribute: 'water', attackType: 'other', enemyTarget: 'all', selectable: false }),
-  attack('gold_breath', '金のいき', { multiplier: '120', attribute: 'all', attackType: 'other', enemyTarget: 'all', selectable: false }),
+  attack('petit_ice_storm', 'プチ・アイスストーム', { multiplier: '85', attribute: 'ice', attackType: 'magic', enemyTarget: 'all', selectable: false }),
+  attack('blizzard_breath_hidden', 'ブリザードブレス', { multiplier: '130', attribute: 'ice', attackType: 'breath', enemyTarget: 'all', selectable: false }),
+  attack('diamond_dust_breath_hidden', 'ダイヤモンドダストの息', { multiplier: '140', attribute: 'ice', attackType: 'breath', enemyTarget: 'all', selectable: false }),
+  attack('flutter', 'はばたき', { multiplier: '50', attribute: 'wind', attackType: 'physical', enemyTarget: 'all', selectable: false }),
+  attack('clear_aqua_breath', 'クリアアクアブレス', { multiplier: '145', attribute: 'water', attackType: 'breath', enemyTarget: 'all', selectable: false }),
+  attack('gold_breath', '金のいき', { multiplier: '120', attribute: 'all', attackType: 'breath', enemyTarget: 'all', selectable: false }),
   attack('light_breath', '光のいき', {
     multiplier: '140', undeadSkillMultiplier: '180', raceSkillMultipliers: { demon: '180' },
-    attribute: 'light', attackType: 'other', enemyTarget: 'all', selectable: false,
+    attribute: 'light', attackType: 'breath', enemyTarget: 'all', selectable: false,
     note: '通常140%。悪魔・アンデッドには180%。'
   }),
-  attack('hellfire_breath', '業火のいき', { multiplier: '120', attribute: 'fire', attackType: 'other', enemyTarget: 'all', selectable: false }),
-  attack('extreme_flame_breath', '極炎のいき', { multiplier: '130', attribute: 'fire', attackType: 'other', enemyTarget: 'all', selectable: false }),
+  attack('hellfire_breath', '業火のいき', { multiplier: '120', attribute: 'fire', attackType: 'breath', enemyTarget: 'all', selectable: false }),
+  attack('extreme_flame_breath', '極炎のいき', { multiplier: '130', attribute: 'fire', attackType: 'breath', enemyTarget: 'all', selectable: false }),
   attack('heat_saber', '熱剣ヒートセイバー', { multiplier: '200', attribute: 'heat', attackType: 'physical', selectable: false }),
   attack('plasma_saber', '超熱剣プラズマセイバー', { multiplier: '250', attribute: 'heat', attackType: 'physical', selectable: false }),
   attack('water_break', 'ウォーターブレイク', {
@@ -274,8 +303,8 @@ export const SKILL_PRESETS = Object.freeze([
   attack('evil_light_wave', '邪光波', { multiplier: '200', attribute: 'evil', attackType: 'magic', selectable: false }),
   attack('rain_spear', '雨の戟', { multiplier: '200', attribute: 'water', attackType: 'physical', selectable: false }),
   attack('doon1_hidden', 'ドウン！', { multiplier: '100', attribute: 'evil', attackType: 'magic', selectable: false }),
-  attack('salamanda_hidden', 'サラマンダ', { multiplier: '90', attribute: 'fire', attackType: 'magic', selectable: false }),
-  attack('fire_storm_hidden', 'ファイアストーム', { multiplier: '110', attribute: 'fire', attackType: 'magic', selectable: false }),
+  attack('salamanda_hidden', 'サラマンダ', { multiplier: '90', attribute: 'fire', attackType: 'magic', enemyTarget: 'all', selectable: false }),
+  attack('fire_storm_hidden', 'ファイアストーム', { multiplier: '110', attribute: 'fire', attackType: 'magic', enemyTarget: 'all', selectable: false }),
   attack('fire0', 'ファイア', { multiplier: '50', attribute: 'fire', attackType: 'magic', selectable: false }),
   attack('fire4', 'ファイア!!!!', { multiplier: '250', attribute: 'fire', attackType: 'magic', selectable: false }),
   attack('aqua0', 'アクア', { multiplier: '50', attribute: 'water', attackType: 'magic', selectable: false }),
@@ -284,6 +313,7 @@ export const SKILL_PRESETS = Object.freeze([
   attack('wind0', 'ウィンド', { multiplier: '50', attribute: 'wind', attackType: 'magic', selectable: false }),
   attack('wind1_hidden', 'ウィンド!', { multiplier: '100', attribute: 'wind', attackType: 'magic', selectable: false }),
   attack('wind3_hidden', 'ウィンド!!!', { multiplier: '200', attribute: 'wind', attackType: 'magic', selectable: false }),
+  attack('ice3_hidden', 'アイス!!!', { multiplier: '200', attribute: 'ice', attackType: 'magic', selectable: false }),
   attack('wind4_hidden', 'ウィンド!!!!', { multiplier: '250', attribute: 'wind', attackType: 'magic', selectable: false }),
 
   major({

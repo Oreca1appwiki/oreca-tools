@@ -185,12 +185,13 @@ approx(meanEnemyEx, 49 / 18, 1e-12);
     return s;
   };
 
-  // 単体魔法：カモフラージュ枝ではBOSSを選べず、固定お供「海竜のしずく」へ攻撃が移る。
+  // 単体魔法：カモフラージュ枝では単体BOSSを選択できないため、その枝では攻撃不発。
   const single = base();
   single.turns[0].allyActions[0] = { kind:'attack', skillName:'単体魔法試験', skillMultiplier:'100', attackAttribute:'none', attackAttribute2:'none', attackType:'magic', enemyTarget:'single', hits:'1', effects:[] };
   const sr = simulateKillProbability(single);
   const op = sr.enemySkillActivation[0]['オプティカルカモフラージュ'] ?? 0;
-  approx(sr.hpDistribution.get('100,0') ?? 0, op, 1e-12);
+  approx(sr.hpDistribution.get(100) ?? 0, op, 1e-12);
+  approx(sr.killChance, 1 - op, 1e-12);
 
   // 全体物理：単体対象不可は関係せず、BOSS本人だけ40%回避する。
   const allPhysical = base();
@@ -240,13 +241,15 @@ approx(meanEnemyEx, 49 / 18, 1e-12);
   const noWater = simulateKillProbability(seaSerpentState('normal'));
   approx(noWater.enemyExFailureChance, 0, 1e-12);
 
-  // 水族3体なら舌なめずりは+9。ターン終了+1でEX10となり、T2敵行動時に失敗する。
-  // よってT2までのEX失敗率はT1舌なめずり発動率と完全一致する。
+  // 水族3体なら舌なめずりは+9。T1発動枝はターン終了+1でEX10となり、T2のBOSS行動時に失敗する。
+  // v0.6.02以降は固定お供「深海タマゴ」の行動機会も正しく保持するため、T2に舌なめずりを引いた枝も
+  // 直後の深海タマゴ行動前にEX10へ到達して失敗する。したがってT2までの失敗率はT1+T2舌なめずり質量。
   const threeWater = simulateKillProbability(seaSerpentState('waterRace'));
   const tongueT1 = threeWater.enemySkillActivation[0]['海竜の舌なめずり'] ?? 0;
-  assert.ok(tongueT1 > 0);
-  approx(threeWater.enemyExFailureChance, tongueT1, 1e-12);
-  approx(threeWater.enemyExFailureByTurn[1], tongueT1, 1e-12);
+  const tongueT2 = threeWater.enemySkillActivation[1]['海竜の舌なめずり'] ?? 0;
+  assert.ok(tongueT1 > 0 && tongueT2 > 0);
+  approx(threeWater.enemyExFailureChance, tongueT1 + tongueT2, 1e-12);
+  approx(threeWater.enemyExFailureByTurn[1], tongueT1 + tongueT2, 1e-12);
 }
 
 // v0.5.62: ナンクルマルの【ゆうらん】は一時離脱→次の本人行動でHP100回復して復帰。

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { attackDamageDistribution, cloneDefaultState, simulateKillProbability, stealExAmount, stealExTransfer, playerExGainFromEnemyAttack } from '../kill/engine.js';
 import { SKILL_PRESETS, SKILL_PRESET_BY_ID } from '../kill/presets.js';
 import { normalActivationTransitions, transformActivationTransitions, transformTargetActivationTransitions, normalCommandTransitions, transformTargetCommandTransitions, TRANSFORM_PROFILE_BY_SKILL } from '../kill/commands.js';
+import { applyBossPresetToEnemy } from '../kill/boss-presets.js';
 
 function approx(actual, expected, eps = 1e-10) {
   assert.ok(Math.abs(actual - expected) <= eps, `expected ${expected}, got ${actual}`);
@@ -158,13 +159,36 @@ console.log('kill-engine tests: OK');
   };
   const phys = attackDamageDistribution({ ...base, attackType: 'physical' });
   const magic = attackDamageDistribution({ ...base, attackType: 'magic' });
+  const breath = attackDamageDistribution({ ...base, attackType: 'breath' });
   const other = attackDamageDistribution({ ...base, attackType: 'other' });
   assert.equal(Math.min(...phys.keys()), 76);
   assert.equal(Math.max(...phys.keys()), 84);
   assert.equal(Math.min(...magic.keys()), 114);
   assert.equal(Math.max(...magic.keys()), 126);
+  assert.equal(Math.min(...breath.keys()), 95);
+  assert.equal(Math.max(...breath.keys()), 105);
   assert.equal(Math.min(...other.keys()), 95);
   assert.equal(Math.max(...other.keys()), 105);
+}
+
+// 9b) v0.5.71: ブレス分類の防御フィルタを独立して適用する。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy = { presetId:'', bossOnlyVictory:false, maxHp:'60', attribute:'none', race:'normal', attack:'0', speed:'100' };
+  s.allies[0] = { characterId:'', attack:'100', speed:'10', star:'4', attribute:'water', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'skip', skillName:'', effects:[] };
+  s.turns[0].enemyAction = { enabled:true, effect:{ type:'enemyDefenseBuff', value:'50', duration:'2', attackTypes:['breath'], nonStacking:true, stackKey:'test:breath' } };
+  s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  s.turns[1].allyActions[0] = { kind:'attack', skillName:'アクアブレス', skillMultiplier:'100', attackAttribute:'water', attackAttribute2:'none', attackType:'breath', enemyTarget:'all', hits:'1', effects:[] };
+  s.turns[1].enemyAction = { enabled:false, effect:{ type:'none' } };
+  const guarded = simulateKillProbability(s);
+  approx(guarded.killChance, 0);
+
+  const other = JSON.parse(JSON.stringify(s));
+  other.turns[1].allyActions[0].attackType = 'other';
+  const unguarded = simulateKillProbability(other);
+  approx(unguarded.killChance, 1);
 }
 
 // 10) 倍率レンジ・ヒット数レンジの確率合計は1になる。
@@ -218,7 +242,7 @@ console.log('kill-engine tests: OK');
     // ユーザー指定の追加枠
     'epidemic_glass', 'poison_bite', 'melting_breath', 'suck_dry',
     // モンスタープリセット由来の「その他」
-    'foot_sweep', 'attack_bang', 'dragon_tail', 'aqua_breath', 'shining_breath',
+    'foot_sweep', 'attack_bang', 'dragon_tail', 'aqua_breath', 'water_breath', 'ice_breath', 'shining_breath',
     'fire1', 'ice1', 'thunder1', 'meteor', 'purifying_flame', 'shiden', 'critical_hit', 'shibire_giri'
   ]) assert.ok(majorIds.has(id), `${id} should be selectable`);
 
@@ -243,7 +267,7 @@ console.log('kill-engine tests: OK');
   assert.deepEqual(bite.effects, [{ type: 'poison' }]);
 
   const melt = SKILL_PRESET_BY_ID.get('melting_breath');
-  assert.deepEqual([melt.skillMultiplier, melt.deadlyPoisonSkillMultiplier, melt.attackType], ['60', '120', 'other']);
+  assert.deepEqual([melt.skillMultiplier, melt.deadlyPoisonSkillMultiplier, melt.attackType], ['60', '120', 'breath']);
   assert.deepEqual(melt.effects, [{ type: 'poisonToDeadly' }]);
 }
 
@@ -430,8 +454,8 @@ console.log('kill-engine tests: OK');
   const others = SKILL_PRESETS.filter(x => x.major === true && x.majorGroup === 'other');
   assert.deepEqual(others.map(x => x.id), [
     'epidemic_glass',
-    'foot_sweep', 'shibire_giri', 'attack_bang', 'dragon_tail',
-    'aqua_breath', 'shining_breath', 'fire1', 'ice1', 'thunder1', 'meteor',
+    'foot_sweep', 'shibire_giri', 'attack_bang', 'triple_attack', 'dragon_tail',
+    'aqua_breath', 'water_breath', 'ice_breath', 'shining_breath', 'fire1', 'ice1', 'thunder1', 'meteor',
     'purifying_flame', 'shiden', 'critical_hit', 'princess_cheer', 'queen_reward'
   ]);
 }
@@ -457,7 +481,7 @@ console.log('kill-engine tests: OK');
   const breath = SKILL_PRESET_BY_ID.get('red_fire_breath');
   assert.deepEqual(
     [breath.skillMultiplier, breath.attackAttribute, breath.attackType, breath.weakDefenderAttribute, breath.weakSkillMultiplier],
-    ['90','fire','other','water','150']
+    ['90','fire','breath','water','150']
   );
   const s = cloneDefaultState();
   s.allyCount = 1;
@@ -730,7 +754,7 @@ console.log('kill-engine tests: OK');
   approx(rate('raijin_kukulkan', 'つつきまくり', 0), 1);
   approx(rate('raijin_kukulkan', 'つつきまくり', 3), 1);
 
-  approx(rate('clear_blue_dragon', 'アクアブレス', 0), 1 / 6);
+  approx(rate('clear_blue_dragon', 'アクアブレス', 0), 5 / 6);
   approx(rate('clear_blue_dragon', 'アクアブレス', 1), 3 / 6);
   approx(rate('clear_blue_dragon', 'アクアブレス', 2), 1 / 6);
   approx(rate('clear_blue_dragon', 'アクアブレス', 3), 0);
@@ -867,7 +891,8 @@ console.log('kill-engine tests: OK');
   const missing = SKILL_PRESETS
     .filter(x => x.selectable !== false)
     .map(x => x.id)
-    .filter(id => id !== 'fire2' && !TRANSFORM_PROFILE_BY_SKILL[id]);
+    // 身外身の術はソンゴクウ本人のEXであり、七十二変化/牛魔王の変化先にはならない。
+    .filter(id => id !== 'fire2' && id !== 'goku_lower_ex' && !TRANSFORM_PROFILE_BY_SKILL[id]);
   assert.deepEqual(missing, [], `変化用プロファイル未登録: ${missing.join(', ')}`);
 }
 
@@ -1174,11 +1199,12 @@ console.log('kill-engine tests: OK');
   assert.ok(r.enemyExFailureChance < 1);
 }
 
-// 51) v0.5.54: 固定お供は個別HPを持ち、BOSSだけ倒しても敵チーム撃破にはならない。
+// 51) v0.5.71: 固定お供を含む全敵撃破が必須。
+// 旧保存データに bossOnlyVictory=true が残っていても、BOSS本体だけでは勝利にしない。
 {
   const s = cloneDefaultState();
   s.allyCount = 1;
-  s.enemy = { presetId:'old1_grim', maxHp:'100', attribute:'wind', race:'normal', attack:'1', speed:'1' };
+  s.enemy = { presetId:'old1_grim', bossOnlyVictory:true, maxHp:'100', attribute:'wind', race:'normal', attack:'1', speed:'1' };
   s.allies[0] = { characterId:'', attack:'200', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
   s.turns[0].allyActions[0] = { kind:'attack', skillName:'単体試験', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', enemyTarget:'single', enemyTargetSlot:'0', hits:'1', effects:[] };
   s.turns[0].enemyAction.enabled = false;
@@ -1187,7 +1213,7 @@ console.log('kill-engine tests: OK');
   assert.ok([...r.hpDistribution.keys()].every(key => String(key) === '0,37,37'));
 }
 
-// 52) v0.5.54: 全体攻撃はBOSSと生存お供すべてへ当たり、全滅で撃破成功になる。
+// 52) v0.5.71: 全体攻撃はBOSSと生存お供すべてへ当たり、全員が倒れた時だけ勝利になる。
 {
   const s = cloneDefaultState();
   s.allyCount = 1;
@@ -1198,6 +1224,68 @@ console.log('kill-engine tests: OK');
   const r = simulateKillProbability(s);
   approx(r.killChance, 1);
   approx(r.hpDistribution.get('0,0,0') ?? 0, 1, 1e-12);
+}
+
+// 52b) v0.5.71: ランダム攻撃は各ヒットごとに生存敵から対象を再抽選する。
+// 3体編成に対する確定致死3hitなら、途中で倒した個体を再抽選せず3体とも倒せる。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy = { presetId:'old1_grim', bossOnlyVictory:false, maxHp:'100', attribute:'wind', race:'normal', attack:'1', speed:'1' };
+  s.allies[0] = { characterId:'', attack:'9999', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'attack', skillName:'ランダム3hit試験', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', enemyTarget:'random', hits:'3', effects:[] };
+  s.turns[0].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 1);
+  approx(r.hpDistribution.get('0,0,0') ?? 0, 1, 1e-12);
+}
+
+// 52c) v0.5.71: リヴィエール実戦回帰。単体攻撃で本体だけ倒しても未撃破、
+// 全体攻撃ヴェノム・サラマンダならBOSS・デメラ・スライムの全員へ当たる。
+{
+  const single = cloneDefaultState();
+  single.allyCount = 1;
+  single.enemy = { presetId:'old0_riviere', bossOnlyVictory:true, maxHp:'100', attribute:'water', race:'demon', attack:'1', speed:'1' };
+  single.allies[0] = { characterId:'', attack:'9999', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  single.turns[0].allyActions[0] = { kind:'attack', skillPresetId:'dark_fire', skillName:'ダークファイア', skillMultiplier:'250', attackAttribute:'fire', attackAttribute2:'dark', attackType:'magic', enemyTarget:'single', enemyTargetSlot:'0', hits:'1', effects:[] };
+  single.turns[0].enemyAction.enabled = false;
+  const singleResult = simulateKillProbability(single);
+  approx(singleResult.killChance, 0);
+  assert.ok([...singleResult.hpDistribution.keys()].every(key => String(key) === '0,77,8'));
+
+  const all = cloneDefaultState();
+  all.allyCount = 1;
+  all.enemy = { presetId:'old0_riviere', bossOnlyVictory:false, maxHp:'100', attribute:'water', race:'demon', attack:'1', speed:'1' };
+  all.allies[0] = { characterId:'', attack:'9999', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  all.turns[0].allyActions[0] = { ...SKILL_PRESET_BY_ID.get('venom_salamanda') };
+  all.turns[0].enemyAction.enabled = false;
+  const allResult = simulateKillProbability(all);
+  approx(allResult.killChance, 1);
+  approx(allResult.hpDistribution.get('0,0,0') ?? 0, 1, 1e-12);
+}
+
+// 52d) v0.5.71: 戦闘中に召喚された敵も撃破条件へ含む。
+// 魔王ムウスに2回行動させて召喚が発生し得る枝を作り、最終ターンにBOSS本体だけを確定撃破する。
+// 召喚なし／召喚後に自滅済みの枝だけが成功し、生存召喚個体が残る枝は未撃破でなければならない。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.enemy = { presetId:'old0_muus', bossOnlyVictory:true, maxHp:'100', attribute:'fire', race:'demon', attack:'1', speed:'30' };
+  s.allies[0] = { characterId:'', attack:'9999', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'skip', skillName:'', effects:[] };
+  s.turns[0].enemyAction.enabled = true;
+  s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  s.turns[2].allyActions[0] = { kind:'attack', skillName:'BOSSだけ撃破', skillMultiplier:'100', attackAttribute:'none', attackAttribute2:'none', attackType:'physical', enemyTarget:'single', enemyTargetSlot:'0', hits:'1', effects:[] };
+  s.turns[2].enemyAction.enabled = false;
+  const r = simulateKillProbability(s);
+  const liveSummonMass = [...r.hpDistribution.entries()].reduce((sum, [key, probability]) => {
+    const parts = String(key).split(',').map(Number);
+    return sum + (parts.slice(1).some(hp => hp > 0) ? probability : 0);
+  }, 0);
+  assert.ok(liveSummonMass > 0, 'summoned-enemy branches should exist');
+  approx(r.killChance, 1 - liveSummonMass, 1e-10);
+  assert.ok(r.killChance < 1, 'living summoned enemies must prevent victory');
 }
 
 // 53) v0.5.54: 単体選択ではお供を明示指定でき、倒されたお供は同ターン後半に行動しない。
@@ -1212,4 +1300,217 @@ console.log('kill-engine tests: OK');
   const r = simulateKillProbability(s);
   assert.equal(r.enemySkillActivation[0]['お供:ロボ零壱式 / アイアンクロー'] ?? 0, 0);
   assert.ok([...r.hpDistribution.keys()].every(key => String(key).split(',')[1] === '0'));
+}
+
+// 51) v0.5.67: 最終ターンをキャラ1直後で打ち切ると、より遅い味方の攻撃は計算外。
+{
+  const base = cloneDefaultState();
+  base.allyCount = 2;
+  base.finalTurnCutoff = 'ally1';
+  base.enemy.maxHp = '150';
+  base.enemy.speed = '10';
+  base.allies[0] = { characterId:'', attack:'10', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  base.allies[1] = { characterId:'', attack:'300', speed:'50', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  base.turns[0].allyActions[0] = { kind:'attack', skillName:'A1', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', hits:'1', effects:[] };
+  base.turns[0].allyActions[1] = { kind:'attack', skillName:'A2', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', hits:'1', effects:[] };
+  base.turns[0].enemyAction.enabled = false;
+  const cutoff = simulateKillProbability(base);
+  approx(cutoff.killChance, 0);
+  assert.equal(cutoff.finalTurnCutoffLabel, 'キャラ1の行動機会直後');
+
+  const full = JSON.parse(JSON.stringify(base));
+  full.finalTurnCutoff = 'lastAlly';
+  const throughA2 = simulateKillProbability(full);
+  approx(throughA2.killChance, 1);
+}
+
+// 52) v0.5.67: キャラ1より遅いBOSSは最終ターンのEX発動リスクも計算外。
+{
+  const make = cutoff => {
+    const s = cloneDefaultState();
+    s.allyCount = 2;
+    s.finalTurnCutoff = cutoff;
+    s.enemy.presetId = 'new5_mashumaro';
+    s.enemy.maxHp = '250';
+    s.enemy.attribute = 'water';
+    s.enemy.race = 'normal';
+    s.enemy.speed = '62';
+    s.allies[0] = { characterId:'', attack:'1', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+    s.allies[1] = { characterId:'', attack:'400', speed:'10', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+    s.turns[0].allyActions[0] = { kind:'attack', skillName:'EX試験10hit', skillMultiplier:'1', attackAttribute:'none', attackType:'physical', enemyTarget:'all', hits:'10', effects:[] };
+    const boom = SKILL_PRESET_BY_ID.get('self_destruct');
+    s.turns[0].allyActions[1] = { ...boom, skillPresetId:boom.id };
+    s.turns[0].enemyAction.enabled = true;
+    return simulateKillProbability(s);
+  };
+  const cutoff = make('ally1');
+  approx(cutoff.enemyExFailureChance ?? 0, 0);
+  approx(cutoff.killChance, 0);
+
+  const legacyStop = make('lastAlly');
+  approx(legacyStop.enemyExFailureChance, 1);
+}
+
+// 53) v0.5.67: 選択キャラより速いBOSSのEX発動リスクは打ち切り前なので残る。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 1;
+  s.finalTurnCutoff = 'ally1';
+  s.enemy.presetId = 'new5_mashumaro';
+  s.enemy.maxHp = '250';
+  s.enemy.attribute = 'water';
+  s.enemy.race = 'normal';
+  s.enemy.speed = '110';
+  s.allies[0] = { characterId:'', attack:'1', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'attack', skillName:'EX試験10hit', skillMultiplier:'1', attackAttribute:'none', attackType:'physical', enemyTarget:'all', hits:'10', effects:[] };
+  s.turns[0].enemyAction.enabled = false;
+  s.turns.push(JSON.parse(JSON.stringify(s.turns[0])));
+  s.turns[1].allyActions[0] = { kind:'skip', skillName:'', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', hits:'1', effects:[] };
+  s.turns[1].enemyAction.enabled = true;
+  const r = simulateKillProbability(s);
+  approx(r.enemyExFailureChance, 1);
+}
+
+// 53) v0.5.69: キャラプリセットの複数技をターン単位で1技に固定できる。
+{
+  const make = fixedCharacterSkill => {
+    const s = cloneDefaultState();
+    s.allyCount = 1;
+    s.allies[0] = { characterId:'chibimuus', attack:'45', speed:'15', star:'2', attribute:'fire', race:'normal', commandVariant:'' };
+    s.enemy.maxHp = '99999';
+    s.enemy.speed = '0';
+    s.turns = s.turns.slice(0, 1);
+    s.turns[0].enemyAction.enabled = false;
+    s.turns[0].allyActions[0] = {
+      ...s.turns[0].allyActions[0],
+      kind:'attack', skillPresetId:'attack_bang', skillName:'こうげき！', skillMultiplier:'100',
+      attackAttribute:'none', attackType:'physical', hits:'1', effects:[], fixedCharacterSkill
+    };
+    return simulateKillProbability(s);
+  };
+
+  const auto = make('');
+  approx(auto.allySkillActivation[0][0]['こうげき！'], 5 / 6);
+  approx(auto.allySkillActivation[0][0]['会心の一撃'], 1 / 6);
+
+  const attackOnly = make('こうげき！');
+  approx(attackOnly.allySkillActivation[0][0]['こうげき！'], 1);
+  assert.equal(attackOnly.allySkillActivation[0][0]['会心の一撃'] ?? 0, 0);
+
+  const criticalOnly = make('会心の一撃');
+  approx(criticalOnly.allySkillActivation[0][0]['会心の一撃'], 1);
+  assert.equal(criticalOnly.allySkillActivation[0][0]['こうげき！'] ?? 0, 0);
+  assert.deepEqual(criticalOnly.missingCommandEffects, []);
+}
+
+// 54) v0.5.74: 全敵撃破した枝はその瞬間に終端し、後続の味方・敵行動を展開しない。
+{
+  const s = cloneDefaultState();
+  s.allyCount = 2;
+  s.enemy = { presetId:'old1_grim', bossOnlyVictory:false, maxHp:'100', attribute:'wind', race:'normal', attack:'1', speed:'1' };
+  s.allies[0] = { characterId:'', attack:'9999', speed:'100', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.allies[1] = { characterId:'', attack:'9999', speed:'90', star:'4', attribute:'fire', race:'normal', commandVariant:'' };
+  s.turns[0].allyActions[0] = { kind:'attack', skillName:'先行全滅', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', enemyTarget:'random', hits:'3', effects:[] };
+  s.turns[0].allyActions[1] = { kind:'attack', skillName:'後続攻撃', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', enemyTarget:'random', hits:'10', effects:[] };
+  s.turns[0].enemyAction.enabled = true;
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 1);
+  approx(r.allySkillActivation[0][1]['後続攻撃'] ?? 0, 0, 1e-12);
+  assert.equal(r.scenarioCountByTurn[0], 0);
+}
+
+// v0.5.79: BOSS＋お供1体でもランダム多段専用DPを使用する。
+// 1hitでどちらを狙っても確殺できる条件では、BOSS/お供が各1/2で倒れ、撃破ボーナス込み敵EXは2になる。
+{
+  const s = cloneDefaultState();
+  s.enemy = { ...s.enemy, presetId:'old1_genbu', maxHp:'100', attribute:'none', race:'normal', speed:'15' };
+  s.allyCount = 1;
+  s.allies[0] = { characterId:'', attack:'999', speed:'100', star:'4', attribute:'none', race:'normal', commandVariant:'' };
+  s.turns = [{
+    allyActions:[{ kind:'attack', skillMultiplier:'100', attackAttribute:'none', attackAttribute2:'none', attackType:'physical', enemyTarget:'random', hits:'1', effects:[] }],
+    enemyAction:{ enabled:false, effect:{ type:'none' } }
+  }];
+  const r = simulateKillProbability(s);
+  approx(r.killChance, 0);
+  approx(r.hpDistribution.get('0,4') ?? 0, 0.5, 1e-12);
+  approx(r.hpDistribution.get('100,0') ?? 0, 0.5, 1e-12);
+  approx(r.enemyExGaugeDistribution.get(2) ?? 0, 1, 1e-12);
+}
+
+
+// v0.5.79: ランダム単体攻撃の対象情報は、追加効果を適用するまでmergeキーに保持する。
+// 同条件の3体なら〖ダーク!〗の沈黙確率は3体で完全に対称になる。
+{
+  const s = cloneDefaultState();
+  s.enemy = applyBossPresetToEnemy(s.enemy, 'old1_grim');
+  s.allyCount = 3;
+  s.allies = [0, 1, 2].map(() => ({
+    characterId:'son_goku', attack:'1', speed:'50', star:'4', attribute:'wind', race:'normal', commandVariant:'stop1'
+  }));
+  const skip = { kind:'skip', skillName:'', skillMultiplier:'100', attackAttribute:'none', attackType:'physical', hits:'1', effects:[] };
+  s.turns = [{ allyActions:[skip, skip, skip], enemyAction:{ enabled:true, effect:{ type:'none' } } }];
+  s.finalTurnCutoff = 'turnEnd';
+  const r = simulateKillProbability(s);
+  const a = r.statusSummaryByTurn[0].map(x => x.silence ?? 0);
+  assert.ok(a[0] > 0.06 && a[0] < 0.07);
+  approx(a[0], a[1], 1e-12);
+  approx(a[1], a[2], 1e-12);
+}
+
+// v0.5.81: 〖EXゲージ+8〗変化先は移動ループを含めても最終的に100%同技へ吸収される。
+{
+  const xs = transformTargetActivationTransitions('ex_plus_8', 'EXゲージ+8', 0);
+  const rate = xs.filter(x => x.activated).reduce((sum, x) => sum + x.probability, 0);
+  approx(rate, 1, 1e-12);
+}
+
+// v0.5.81: 試作魔銃はHP1を撃破できず、満タン2000では ATK57×300%×乱数±5% = 162〜179ダメージ。
+{
+  const make = hp => {
+    const s = cloneDefaultState();
+    s.enemy = applyBossPresetToEnemy(s.enemy, 'old2_ifrit');
+    s.enemy.maxHp = String(hp);
+    s.enemy.speed = '0';
+    s.allyCount = 1;
+    s.allies[0] = { characterId:'custom', attack:'57', speed:'63', star:'3', attribute:'water', race:'machine', commandVariant:'' };
+    const p = SKILL_PRESET_BY_ID.get('trial_gun');
+    s.turns = [{
+      allyActions:[{ ...p, skillPresetId:'trial_gun' }],
+      enemyAction:{ enabled:false, effect:{ type:'skip' } }
+    }];
+    s.finalTurnCutoff = 'lastAlly';
+    return simulateKillProbability(s);
+  };
+  const one = make(1);
+  approx(one.killChance, 0);
+  approx(one.hpDistribution.get(1) ?? 0, 1);
+
+  const full = make(2000);
+  approx(full.killChance, 0);
+  const liveHp = [...full.hpDistribution.keys()].map(Number);
+  assert.equal(Math.min(...liveHp), 1821);
+  assert.equal(Math.max(...liveHp), 1838);
+}
+
+// v0.5.81: 身外身の術はプレイヤーEX10が必要。EX+8＋ターン終了+1×2で10に到達した場合だけ発動する。
+{
+  const make = firstSkillId => {
+    const s = cloneDefaultState();
+    s.enemy = applyBossPresetToEnemy(s.enemy, 'old2_ifrit');
+    s.enemy.maxHp = '1';
+    s.enemy.speed = '0';
+    s.allyCount = 1;
+    s.allies[0] = { characterId:'son_goku', attack:'84', speed:'78', star:'4', attribute:'wind', race:'normal', commandVariant:'stop1' };
+    const act = id => id
+      ? { ...SKILL_PRESET_BY_ID.get(id), skillPresetId:id }
+      : { kind:'skip', skillName:'', effects:[] };
+    s.turns = [firstSkillId, 'oni_spirit', 'goku_lower_ex'].map(id => ({
+      allyActions:[act(id)],
+      enemyAction:{ enabled:false, effect:{ type:'skip' } }
+    }));
+    s.finalTurnCutoff = 'lastAlly';
+    return simulateKillProbability(s);
+  };
+  approx(make('ex_plus_8').killChance, 1);
+  approx(make('').killChance, 0);
 }

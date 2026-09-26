@@ -22,7 +22,7 @@ for (const atk of [31,57,68,73,84,94,101,125]) {
     for (const attr of ['none','fire','water','earth','wind','holy','dark','all']) {
       for (const enemy of ['fire','water','earth','wind']) {
         for (const race of ['normal','undead']) {
-          for (const type of ['physical','magic','other']) {
+          for (const type of ['physical','magic','breath','other']) {
             const dist=attackDamageDistribution({attack:atk,skillMultiplier:skill,attackAttribute:attr,attackAttribute2:'none',attackType:type,defenderAttribute:enemy,defenderRace:race,defenseMods:[],weaknessBoost:false,hits:'1',hitsMin:'',hitsMax:''});
             const skill10=Math.round(Number(skill)*10);
             let base=trunc(atk*skill10,1000);

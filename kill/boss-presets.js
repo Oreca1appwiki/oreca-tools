@@ -11,7 +11,9 @@ const p = (id, chapter, name, hp, attribute, raceLabel, speed, extra = {}) => ({
   chart: extra.chart ?? 'old',
   encounterNote: extra.encounterNote ?? '',
   companions: extra.companions ?? [],
+  inferCompanions: extra.inferCompanions ?? true,
   note: extra.note ?? '',
+  enemyExRequiresCompanionNames: extra.enemyExRequiresCompanionNames ?? [],
   enemyCount: Math.max(1, Number(extra.enemyCount ?? 1) || 1)
 });
 
@@ -24,6 +26,7 @@ const BASE_BOSS_PRESETS = [
   p('old0_heavy_behemoth','序章','重竜ベヒモス',1500,'earth','ドラゴン',10),
   p('old0_blue_dragon','序章','ブルードラゴン',1400,'water','ドラゴン',25),
   p('old0_riviere','序章','魔王リヴィエール',1800,'water','悪魔',52,{speedRaw:'50+2'}),
+  p('old0_mushufushu','序章','怒る蛇ムシュフシュ',2033,'earth','ドラゴン',20),
   p('old0_silver_dragon','序章','シルバードラゴン',2567,'wind','ドラゴン',50),
 
   p('old1_grim','第1章','死神グリム',666,'wind','悪魔',70,{speedRaw:'66+4'}),
@@ -32,27 +35,29 @@ const BASE_BOSS_PRESETS = [
   p('old1_blizzard_dragon','第1章','ブリザードドラゴン',2200,'water','ドラゴン',50),
   p('old1_fafnir','第1章','暗黒竜ファヴニール',2800,'earth','ドラゴン',30),
 
+  p('old2_rock_dragon','第2章','岩竜ロックドラゴン',1900,'earth','ドラゴン',5),
   p('old2_soccerra','第2章','魔王サッカーラ',2200,'earth','悪魔',20),
   p('old2_skullbone','第2章','スカルボーンドラゴン',2400,'earth','ドラゴン',10),
-  p('old2_ifrit','第2章','魔人イフリート',2000,'fire','火族',0),
+  p('old2_ifrit','第2章','魔人イフリート',2000,'fire','火族',0,{note:'Wiki周回チャートは3ターンで倒せない場合に敵EXを受け、その後も継続する設計。敵EX許容回数0では従来どおり1回目のEXで失敗扱い。Wikiどおり継続させる場合は許容回数を増やしてください。'}),
 
-  p('old3_yamata','第3章','ヤマタノオロチ',1800,'wind','ドラゴン',70),
-  p('old3_kukulkan','第3章','龍神ククルカン',1900,'wind','ドラゴン',80),
+  p('old3_yamata','第3章','ヤマタノオロチ',1800,'wind','ドラゴン',70,{encounterNote:'ヤマタマゴとの2体編成',companions:['ヤマタマゴ']}),
+  p('old3_kukulkan','第3章','龍神ククルカン',1900,'wind','ドラゴン',80,{inferCompanions:false,note:'旧3章版は鳥竜のタマゴを伴わない。新3章版のみ鳥竜のタマゴを伴う。'}),
   p('old3_nanawarai','第3章','魔王ナナワライ',2000,'wind','悪魔',60),
   p('old3_fanlong','第3章','竜帝ファンロン',2500,'earth','ドラゴン',45,{encounterNote:'金竜のタマゴとの2体編成',companions:['金竜のタマゴ']}),
 
-  p('old4_chibimuus','第4章','チビムウス',850,'fire','悪魔',15),
+  p('old4_chibimuus','第4章','チビムウス',850,'fire','悪魔',15,{inferCompanions:false,note:'BOSS戦は単体。魔王のトリタマゴは撃破後の入手形態であり、お供ではありません。'}),
+  p('old4_salamander','第4章','炎竜サラマンダー',1500,'fire','ドラゴン',35,{encounterNote:'炎竜のタマゴとの2体編成',companions:['炎竜のタマゴ']}),
   p('old4_lafroig','第4章','魔皇ラフロイグ',1400,'fire','悪魔',35),
   p('old4_chiviere','第4章','チヴィエール',800,'water','悪魔',25),
 
-  p('old5_frost_dragon','第5章','凍竜フロストドラゴン',1700,'water','ドラゴン',55),
-  p('old5_kujeska','第5章','魔皇クジェスカ',1500,'water','悪魔',50),
+  p('old5_frost_dragon','第5章','凍竜フロストドラゴン',1700,'water','ドラゴン',55,{encounterNote:'凍竜のタマゴとの2体編成',companions:['凍竜のタマゴ']}),
+  p('old5_kujeska','第5章','魔皇クジェスカ',1500,'water','悪魔',50,{encounterNote:'魔人魚セイレンとの2体編成',companions:['魔人魚セイレン'],note:'固定お供の魔人魚セイレンはCPU個体のコマンド構成がランダムなため、進化元・人魚セイレンの入手時初期コマンドを下位リールに用いた近似で計算します。'}),
 
   p('old6_white_dragon','第6章','ホワイトドラゴン',1500,'water','ドラゴン',70),
-  p('old6_enma','第6章','獄王閻魔',1650,'earth','アンデッド',60),
+  p('old6_enma','第6章','獄王閻魔',1650,'earth','アンデッド',60,{encounterNote:'シャックル×2との3体編成',companions:['シャックル','シャックル']}),
   p('old6_tokai','第6章','魔皇トカイ',1710,'earth','アンデッド',70,{hpRaw:'1700+10'}),
 
-  p('old7_son_goku','第7章','斉天大聖ソンゴクウ',900,'wind','風族',75),
+  p('old7_son_goku','第7章','斉天大聖ソンゴクウ',900,'wind','風族',75,{inferCompanions:false,note:'BOSS戦は単体。猿石は撃破後のバトル入手モンスターであり、旧7章周回チャートではプレイヤー側3体目として採用されています。'}),
   p('old7_maotai','第7章','魔皇マオタイ',1500,'wind','悪魔',70),
 
   // 新章チャート
@@ -61,30 +66,30 @@ const BASE_BOSS_PRESETS = [
   p('new0_nergal','新序章','覇将ネルガル',1200,'wind','戦士',50,{chart:'new',encounterNote:'参謀エンリルとの2体編成',companions:['参謀エンリル']}),
   p('new0_marduk','新序章','狂王マルドク',1600,'wind','悪魔',75,{chart:'new'}),
 
-  p('new1_stream_dragon','新1章','海竜ストリームドラゴン',1300,'water','海竜',65,{chart:'new',note:'BOSS専用パラメータを採用',encounterNote:'海竜のしずくとの2体編成',companions:['海竜のしずく']}),
+  p('new1_stream_dragon','新1章','海竜ストリームドラゴン',1300,'water','海竜',65,{chart:'new',inferCompanions:false,note:'BOSS戦は単体。海竜のしずくは固定お供ではないため自動推定しません。'}),
   p('new1_fiska','新1章','魔海将フィスカ',1650,'water','悪魔',47,{chart:'new',speedRaw:'45+2'}),
   p('new1_robo_03','新1章','ロボ零参式',1620,'earth','機械',25,{chart:'new',hpRaw:'1600+20'}),
 
   p('new2_arp','新2章','魔神アープ',800,'water','水族',50,{chart:'new'}),
   p('new2_ash_dragon','新2章','灰竜アッシュドラゴン',1250,'earth','ドラゴン',45,{chart:'new',encounterNote:'竜灰との2体編成',companions:['竜灰']}),
   p('new2_gnome','新2章','魔神グノーム',2000,'earth','土族',25,{chart:'new'}),
-  p('new2_vamps_dragon','新2章','吸血竜ヴァンプスドラゴン',1500,'fire','ドラゴン',45,{chart:'new'}),
+  p('new2_vamps_dragon','新2章','吸血竜ヴァンプスドラゴン',1500,'fire','ドラゴン',45,{chart:'new',inferCompanions:false,note:'BOSS戦は単体。吸血竜のタマゴはこのBOSS戦で入手できるが固定お供ではないため自動推定しません。'}),
 
   p('new3_root_dragon','新3章','大樹竜ルートドラゴン',1410,'wind','ドラゴン',64,{chart:'new',hpRaw:'1400+10',speedRaw:'60+4'}),
   p('new3_deathfear_plant','新3章','デスフィアープラント',1600,'earth','植物',50,{chart:'new',encounterNote:'デスプラント・大樹竜の球根との3体編成',companions:['デスプラント','大樹竜の球根']}),
   p('new3_nirahalar','新3章','神人ニラーハラー',1550,'water','悪魔',50,{chart:'new'}),
   p('new3_oroshi','新3章','風隠の族長オロシ',1500,'wind','戦士',65,{chart:'new'}),
 
-  p('new4_iron_dragon','新4章','黒鉄竜アイアンドラゴン',1600,'fire','ドラゴン',35,{chart:'new'}),
+  p('new4_iron_dragon','新4章','黒鉄竜アイアンドラゴン',1600,'fire','ドラゴン',35,{chart:'new',encounterNote:'鉄のタマゴとの2体編成',companions:['鉄のタマゴ']}),
   p('new4_garp','新4章','魔将ガープ',1400,'fire','悪魔',70,{chart:'new',encounterNote:'ダークサラマンダー・魔鏡騎士リフレクとの3体編成',companions:['ダークサラマンダー','魔鏡騎士リフレク']}),
   p('new4_phantom','新4章','ファントム',1300,'fire','悪魔',45,{chart:'new'}),
-  p('new4_avaddon','新4章','魔王アヴァドン',1510,'earth','悪魔',10,{chart:'new',hpRaw:'1500+10',encounterNote:'アヴァドンフード×2との3体編成',companions:['アヴァドンフード','アヴァドンフード']}),
+  p('new4_avaddon','新4章','魔王アヴァドン',1510,'earth','悪魔',10,{chart:'new',hpRaw:'1500+10',encounterNote:'アヴァドンフード×2との3体編成',companions:['アヴァドンフード','アヴァドンフード'],enemyExRequiresCompanionNames:['アヴァドンフード'],note:'アヴァドンフードが全滅している間はEX技を使用しない。'}),
 
   p('new5_mashumaro','新5章','マシュまろ',250,'water','幻獣',62,{chart:'new',speedRaw:'60+2',enemyCount:3,encounterNote:'同一BOSS3体編成。3体のHPを個別追跡して撃破率を計算'}),
   p('new5_glacier_dragon','新5章','グレイシアドラゴン',1800,'water','ドラゴン',30,{chart:'new',encounterNote:'竜氷山との2体編成',companions:['竜氷山']}),
   p('new5_barolo','新5章','海王バローロ',1900,'water','悪魔',40,{chart:'new'}),
   p('new5_sea_serpent','新5章','魔海竜シーサーペント',1700,'water','海竜',45,{chart:'new'}),
-  p('new5_god_barolo','新5章','神海帝バローロ',2000,'water','悪魔',45,{chart:'new'}),
+  p('new5_god_barolo','新5章','神海帝バローロ',2000,'water','悪魔',45,{chart:'new',encounterNote:'巫女ラムーネとの2体編成',companions:['巫女ラムーネ']}),
 
   p('new6_necro_dragon','新6章','鬼竜ネクロドラゴン',1500,'earth','アンデッド',25,{chart:'new'}),
   p('new6_elysion','新6章','光王エーリュシオン',1950,'earth','天使',45,{chart:'new'}),
@@ -140,6 +145,7 @@ function encounterPartyFor(preset) {
 }
 
 function inferredCompanions(preset) {
+  if (preset.inferCompanions === false) return preset.companions ?? [];
   const row = encounterPartyFor(preset);
   if (!row) return preset.companions ?? [];
   const party = String(row[3]).split(' / ').map(name => name.replace(/^\(BOSS\)/, ''));
@@ -165,10 +171,11 @@ export const BOSS_CHAPTER_ORDER = Object.freeze([
 
 export function applyBossPresetToEnemy(enemy, presetId) {
   const preset = BOSS_PRESET_BY_ID.get(presetId);
-  if (!preset) return { ...enemy, presetId: '' };
+  if (!preset) return { ...enemy, presetId: '', bossOnlyVictory: false };
   return {
     ...enemy,
     presetId: preset.id,
+    bossOnlyVictory: false,
     maxHp: String(preset.hp),
     attribute: preset.attribute,
     race: preset.race,

@@ -1,9 +1,9 @@
 {
   "name": "oreca-tools",
-  "version": "0.5.66",
+  "version": "0.6.05",
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/damage-engine.test.js && node tests/kill-engine.test.js && node tests/enemy-actions.test.js && node tests/companion-defense.test.js && node tests/ally-enemy-status.test.js && node tests/kill-presets.test.js && node tests/boss-presets.test.js && node tests/audit-kill-core.mjs && node tests/encounter-engine.test.js && node tests/skill-engine.test.js"
+    "test": "node tests/damage-engine.test.js && node tests/kill-engine.test.js && node tests/enemy-off-public.test.js && node tests/enemy-manual-public.test.js && node tests/enemy-ex-allowance.test.js && node tests/enemy-manual-boss-smoke.test.js && node tests/enemy-off-boss-smoke.test.js && node tests/enemy-actions.test.js && node tests/companion-defense.test.js && node tests/ally-enemy-status.test.js && node tests/kill-presets.test.js && node tests/boss-presets.test.js && node tests/old2-chart-regression.test.js && node tests/old3-chart-regression.test.js && node tests/old3-manual-regression.test.js && node tests/old4-chart-regression.test.js && node tests/old5-chart-regression.test.js && node tests/old5-manual-regression.test.js && node tests/old6-manual-regression.test.js && node tests/lava-boost.test.js && node tests/old7-manual-regression.test.js && node tests/new0-manual-regression.test.js && node tests/new1-manual-regression.test.js && node tests/new2-manual-regression.test.js && node tests/new3-manual-regression.test.js && node tests/new4-manual-regression.test.js && node tests/new5-manual-regression.test.js && node tests/new6-manual-regression.test.js && node tests/qchapter-manual-regression.test.js && node tests/audit-kill-core.mjs && node tests/encounter-engine.test.js && node tests/skill-engine.test.js && node tests/manual-calc-ui.test.js && node tests/mining-static.test.js"
   }
 }
